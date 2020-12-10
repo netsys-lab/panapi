@@ -10,16 +10,16 @@ import (
 )
 
 func main() {
-	serv := *taps.NewLocalEndpoint()
+	serv := taps.NewLocalEndpoint()
 	serv.WithInterface("any")
-	serv.WithService("tcp")
+	serv.WithService("quic")
+	// serv.WithService("tcp")
 	serv.WithIPv4Address("127.0.0.1")
 	serv.WithPort("5555")
 
-	transProp := *taps.NewTransportProperties()
-	secParam := *taps.NewSecurityParameters()
-
-	preconn := *taps.NewPreconnection(serv, transProp, secParam)
+	transProp := taps.NewTransportProperties()
+	secParam := taps.NewSecurityParameters()
+	preconn := taps.NewPreconnection(serv, transProp, secParam)
 	lis := preconn.Listen()
 
 	quitter := make(chan bool)
@@ -36,13 +36,12 @@ func main() {
 		}
 	}()
 
-	conn := *taps.NewConnection(nil)
+	var conn taps.Connection
 
 loop:
 	for {
 		select {
 		case conn = <-lis.ConnRec:
-			lis.Stop()
 			go func() {
 				for {
 					msg := conn.Receive()
@@ -50,8 +49,9 @@ loop:
 				}
 			}()
 		case msg := <-sender:
-			conn.Send(*taps.NewMessage(msg, ""))
+			conn.Send(taps.NewMessage(msg, ""))
 		case <-quitter:
+			lis.Stop()
 			break loop
 		}
 	}
