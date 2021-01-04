@@ -1,6 +1,7 @@
 package taps
 
 import (
+	"crypto/rsa"
 	"net"
 
 	quic "github.com/lucas-clemente/quic-go"
@@ -9,8 +10,15 @@ import (
 //
 
 const (
-	SERV_TCP  = 0
-	SERV_QUIC = 1
+	SERV_NONE = 1
+	SERV_TCP  = 2
+	SERV_QUIC = 3
+
+	KEYPAIR = "keypair"
+)
+
+var (
+	SERV_NAMES = []string{"none (invalid)", "none", "tcp", "quic"}
 )
 
 //
@@ -33,7 +41,10 @@ type RemoteEndpoint struct {
 
 type TransportProperties struct{}
 
-type SecurityParameters struct{}
+type SecurityParameters struct {
+	privateKey *rsa.PrivateKey
+	publicKey  *rsa.PublicKey
+}
 
 type Preconnection struct {
 	locEnd    *LocalEndpoint
@@ -55,6 +66,7 @@ type Connection struct {
 	qconn   quic.Session
 	preconn *Preconnection
 	active  bool
+	Err     error
 }
 
 type Message struct {

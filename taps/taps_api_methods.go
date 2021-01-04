@@ -1,96 +1,149 @@
 package taps
 
-import "fmt"
+import (
+	"crypto/rsa"
+	"errors"
+	"net"
+	"strconv"
+)
 
 //
 // Endpoint
 //
 
-func (endPo *Endpoint) WithInterface(interfaceName string) {
+func (endPo *Endpoint) WithInterface(interfaceName string) error {
 	endPo.interfaceName = interfaceName
-	// i, _ := net.Interfaces()
-	// _, e := net.InterfaceByName("")
-	// fmt.Print(i)
+	var err error = nil
+	if interfaceName != "any" {
+		_, err = net.InterfaceByName(interfaceName)
+	}
+	return err
 }
 
-func (endPo *Endpoint) WithPort(port string) {
+func (endPo *Endpoint) WithPort(port string) error {
+	_, err := strconv.Atoi(port)
+	if err != nil {
+		return &tapsError{Op: "WithPort", Port: port, Err: err}
+	}
+	if len(port) > 5 {
+		return &tapsError{Op: "WithPort", Port: port, Err: errInvalidPort}
+	}
 	endPo.port = port
+	return nil
 }
 
-func (endPo *Endpoint) WithIPv4Address(addr string) {
+func (endPo *Endpoint) WithIPv4Address(addr string) error {
+	if net.ParseIP(addr) == nil {
+		return &tapsError{Op: "WithIPv4Address", Ipv4address: addr, Err: errInvalidIPAddress}
+	}
 	endPo.ipv4address = addr
+	return nil
 }
 
-func (endPo *Endpoint) WithService(serviceType string) {
+func (endPo *Endpoint) WithService(serviceType string) error {
 	switch serviceType {
 	case "tcp":
 		endPo.serviceType = SERV_TCP
 	case "quic":
 		endPo.serviceType = SERV_QUIC
+	default:
+		return &tapsError{Op: "WithService", ServiceTypeInvalid: serviceType, Err: errUnknownServiceType}
 	}
+	return nil
 }
 
-func (remEndPo *RemoteEndpoint) WithHostname(hostName string) {
+func (remEndPo *RemoteEndpoint) WithHostname(hostName string) error {
 	remEndPo.hostName = hostName
+	return nil
 }
 
 //
 // TransportProperties
 //
 
-func (tranProp *TransportProperties) Require(method string) {
+func (tranProp *TransportProperties) Require(method string) error {
 	// process data
+	return nil
 }
 
 //
 // SecurityParameters
 //
 
-func (secParam *SecurityParameters) Set(id string, list ...int) {
-	// process data
+func (secParam *SecurityParameters) Set(name string, args ...interface{}) error {
+	switch name {
+	case KEYPAIR:
+		for i, arg := range args {
+			switch arg.(type) {
+			case *rsa.PrivateKey:
+				secParam.privateKey = arg.(*rsa.PrivateKey)
+			case *rsa.PublicKey:
+				secParam.publicKey = arg.(*rsa.PublicKey)
+			default:
+				return &tapsError{Op: "Set", ArgNum: i, Err: errInvalidArgument}
+			}
+		}
+	default:
+		return &tapsError{Op: "Set", SetName: name, Err: errUnknownSetName}
+	}
+	return nil
 }
 
 //
 // Preconnection
 //
 
-func (preconn *Preconnection) Listen() *Listener {
-	var lis *Listener
-	switch preconn.getServiceType() {
-	case SERV_TCP:
-		lis = preconn.tpcListen()
-	case SERV_QUIC:
-		lis = preconn.quicListen()
+func (preconn *Preconnection) Listen() (*Listener, error) {
+	servType, err := preconn.getServiceType()
+	if err != nil {
+		return nil, &tapsError{Op: "Listen", Err: err}
 	}
-	return lis
+	var lis *Listener
+	switch servType {
+	case SERV_TCP:
+		lis, err = preconn.tpcListen()
+	case SERV_QUIC:
+		lis, err = preconn.quicListen()
+	}
+	return lis, err
 }
 
-func (preconn *Preconnection) Initiate() *Connection {
-	var ret *Connection
-	switch preconn.getServiceType() {
-	case SERV_TCP:
-		ret = preconn.tcpInitiate()
-	case SERV_QUIC:
-		ret = preconn.quicInitiate()
+func (preconn *Preconnection) Initiate() (*Connection, error) {
+	servType, err := preconn.getServiceType()
+	if err != nil {
+		return nil, &tapsError{Op: "Initiate", Err: err}
 	}
-	return ret
+	var conn *Connection
+	switch servType {
+	case SERV_TCP:
+		conn, err = preconn.tcpInitiate()
+	case SERV_QUIC:
+		conn, err = preconn.quicInitiate()
+	}
+	return conn, err
 }
 
 //
 // Listener
 //
 
-func (lis *Listener) Stop() {
+func (lis *Listener) Stop() error {
+	var err error = nil
 	if lis.isOpen() {
 		lis.active = false
 		lis.ConnRec = nil
-		switch lis.preconn.getServiceType() {
+		servType, err := lis.preconn.getServiceType()
+		if err != nil {
+			return &tapsError{Op: "Stop", Err: err}
+		}
+		switch servType {
 		case SERV_TCP:
-			lis.tcpStop()
+			err = lis.tcpStop()
 		case SERV_QUIC:
-			lis.quicStop()
+			err = lis.quicStop()
 		}
 	}
+	return err
 }
 
 //
@@ -98,39 +151,54 @@ func (lis *Listener) Stop() {
 //
 
 func (conn *Connection) Clone() *Connection {
-	return &Connection{conn.nconn, conn.qconn, conn.preconn, conn.active}
+	return &Connection{conn.nconn, conn.qconn, conn.preconn, conn.active, nil}
 }
 
-func (conn *Connection) Receive() *Message {
+func (conn *Connection) Receive() (*Message, error) {
+	servType, err := conn.preconn.getServiceType()
+	if err != nil {
+		return nil, &tapsError{Op: "Receive", Err: err}
+	}
 	var ret *Message
-	switch conn.preconn.getServiceType() {
+	switch servType {
 	case SERV_TCP:
-		ret = conn.tcpReceive()
+		ret, err = conn.tcpReceive()
 	case SERV_QUIC:
-		ret = conn.quicReceive()
+		ret, err = conn.quicReceive()
 	}
-	return ret
+	return ret, err
 }
 
-func (conn *Connection) Send(msg *Message) {
-	switch conn.preconn.getServiceType() {
-	case SERV_TCP:
-		conn.tcpSend(msg)
-	case SERV_QUIC:
-		conn.quicSend(msg)
+func (conn *Connection) Send(msg *Message) error {
+	servType, err := conn.preconn.getServiceType()
+	if err != nil {
+		return &tapsError{Op: "Send", Err: err}
 	}
+	switch servType {
+	case SERV_TCP:
+		err = conn.tcpSend(msg)
+	case SERV_QUIC:
+		err = conn.quicSend(msg)
+	}
+	return err
 }
 
-func (conn *Connection) Close() {
+func (conn *Connection) Close() error {
+	var err error = nil
 	if conn.isOpen() {
 		conn.active = false
-		switch conn.preconn.getServiceType() {
+		servType, err := conn.preconn.getServiceType()
+		if err != nil {
+			return &tapsError{Op: "Close", Err: err}
+		}
+		switch servType {
 		case SERV_TCP:
-			conn.tcpClose()
+			err = conn.tcpClose()
 		case SERV_QUIC:
-			conn.quicClose()
+			err = conn.quicClose()
 		}
 	}
+	return err
 }
 
 //
@@ -149,17 +217,16 @@ func (lis *Listener) isOpen() bool {
 	return lis.active
 }
 
-func (preconn *Preconnection) getServiceType() int {
+func (preconn *Preconnection) getServiceType() (int, error) {
 	if preconn.locEnd == nil {
 		if preconn.remEnd != nil {
-			return preconn.remEnd.serviceType
+			return preconn.remEnd.serviceType, nil
 		}
 	}
 	if preconn.remEnd == nil {
 		if preconn.locEnd != nil {
-			return preconn.locEnd.serviceType
+			return preconn.locEnd.serviceType, nil
 		}
 	}
-	fmt.Println("Error no Service Type")
-	return -1
+	return 0, errors.New("no service type")
 }

@@ -1,68 +1,81 @@
 package taps
 
 import (
-	"fmt"
 	"io"
 	"net"
 )
 
 //
 
-func (preconn *Preconnection) tpcListen() *Listener {
-	var lis *Listener
+func (preconn *Preconnection) tpcListen() (*Listener, error) {
 	nlis, err := net.Listen("tcp", preconn.locEnd.ipv4address+":"+preconn.locEnd.port)
 	if err != nil {
-		fmt.Println("Error listening:", err.Error())
+		return nil, &tapsError{Op: "tpcListen", Err: err}
 	}
-	lis = NewListener(nlis, preconn)
+	lis, err := NewListener(nlis, preconn)
+	if err != nil {
+		return nil, &tapsError{Op: "tpcListen", Err: err}
+	}
 	go func() {
-		conn, err := lis.nlis.Accept()
+		nconn, err := lis.nlis.Accept()
 		if err != nil && lis.isOpen() {
-			fmt.Println("Error accepting:", err.Error())
+			lis.ConnRec <- Connection{Err: err}
+			return
 		}
-		lis.ConnRec <- *NewConnection(conn, preconn)
+		conn, err := NewConnection(nconn, preconn)
+		if err != nil {
+			lis.ConnRec <- Connection{Err: err}
+			return
+		}
+		lis.ConnRec <- *conn
 	}()
-	return lis
+	return lis, nil
 }
 
-func (preconn *Preconnection) tcpInitiate() *Connection {
+func (preconn *Preconnection) tcpInitiate() (*Connection, error) {
 	conn, err := net.Dial("tcp", preconn.remEnd.hostName+":"+preconn.remEnd.port)
 	if err != nil {
-		fmt.Println(err.Error())
+		return nil, &tapsError{Op: "tcpInitiate", Err: err}
 	}
 	return NewConnection(conn, preconn)
 }
 
-func (lis *Listener) tcpStop() {
-	lis.nlis.Close()
+func (lis *Listener) tcpStop() error {
+	return lis.nlis.Close()
 }
 
-func (conn *Connection) tcpReceive() *Message {
+func (conn *Connection) tcpReceive() (*Message, error) {
 	bufSize := 1024
 	buf := make([]byte, bufSize)
 	if conn.isOpen() {
-		n, err := conn.nconn.Read(buf)
+		_, err := conn.nconn.Read(buf)
 		if err != nil && err != io.EOF && conn.isOpen() {
-			fmt.Println("Error reading:", err.Error())
-			conn.Close()
+			err2 := conn.Close()
+			if err2 != nil {
+				return nil, &tapsError{Op: "tcpReceive", Err: err2}
+			}
+			return nil, &tapsError{Op: "tcpReceive", Err: err}
 		}
-		if n > bufSize {
-			fmt.Println("Read buffer overflow:", err.Error())
-		}
+		return &Message{string(buf), "context"}, nil
 	}
-	return &Message{string(buf), "context"}
+	return nil, &tapsError{Op: "tcpReceive", Err: errReadOnClosedConnection}
 }
 
-func (conn *Connection) tcpSend(msg *Message) {
+func (conn *Connection) tcpSend(msg *Message) error {
 	if conn.isOpen() {
 		_, err := conn.nconn.Write([]byte(msg.Data))
 		if err != nil {
-			fmt.Println("Error sending:", err.Error())
-			conn.Close()
+			err2 := conn.Close()
+			if err2 != nil {
+				return &tapsError{Op: "tcpSend", Err: err2}
+			}
+			return &tapsError{Op: "tcpSend", Err: err}
 		}
+		return nil
 	}
+	return &tapsError{Op: "tcpSend", Err: errWriteOnClosedConnection}
 }
 
-func (conn *Connection) tcpClose() {
-	conn.nconn.Close()
+func (conn *Connection) tcpClose() error {
+	return conn.nconn.Close()
 }
