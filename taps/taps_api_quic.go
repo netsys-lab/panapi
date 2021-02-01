@@ -34,7 +34,7 @@ func (preconn *Preconnection) generateTLSConfig() *tls.Config {
 
 func (preconn *Preconnection) quicListen() (*Listener, error) {
 	var lis *Listener
-	qlis, err := quic.ListenAddr(preconn.locEnd.ipv4address+":"+preconn.locEnd.port, preconn.generateTLSConfig(), nil)
+	qlis, err := quic.ListenAddr("["+preconn.locEnd.ipv4address+"]:"+preconn.locEnd.port, preconn.generateTLSConfig(), nil)
 	if err != nil {
 		return nil, &tapsError{Op: "quicListen", Err: err}
 	}
@@ -60,7 +60,7 @@ func (preconn *Preconnection) quicInitiate() (*Connection, error) {
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"taps-quic-test"},
 	}
-	session, err := quic.DialAddr(preconn.remEnd.ipv4address+":"+preconn.remEnd.port, tlsConf, nil)
+	session, err := quic.DialAddr("["+preconn.remEnd.ipv4address+"]:"+preconn.remEnd.port, tlsConf, nil)
 	if err != nil {
 		return nil, &tapsError{Op: "quicInitiate", Err: err}
 	}

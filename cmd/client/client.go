@@ -23,30 +23,37 @@ func main() {
 	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
 	defer exec.Command("stty", "-F", "/dev/tty", "echo").Run()
 
-	servF := flag.String("serv", "tcp", "tcp or quic")
+	var err error
+
+	servF := flag.String("serv", "tcp", "tcp or quic or scion")
 	ipF := flag.String("ip", "127.0.0.1", "ip address")
 	portF := flag.String("port", "1111", "port")
 	interF := flag.String("inter", "any", "interface name")
 	flag.Parse()
 
 	cli := taps.NewRemoteEndpoint()
-	cli.WithInterface(*interF)
-	cli.WithService(*servF)
-	cli.WithIPv4Address(*ipF)
-	cli.WithPort(*portF)
+	err = cli.WithInterface(*interF)
+	check(err)
+	err = cli.WithService(*servF)
+	check(err)
+	err = cli.WithIPv4Address(*ipF)
+	check(err)
+	err = cli.WithPort(*portF)
+	check(err)
 
 	transProp := taps.NewTransportProperties()
 
 	privatKey, err := rsa.GenerateKey(rand.Reader, 1024)
-	if err != nil {
-		panic(err)
-	}
+	check(err)
+
 	secParam := taps.NewSecurityParameters()
 	secParam.Set("keypair", privatKey, &privatKey.PublicKey)
+	check(err)
 
 	preconn, err := taps.NewPreconnection(cli, transProp, secParam)
-
+	check(err)
 	conn, err := preconn.Initiate()
+	check(err)
 
 	quitter := make(chan bool)
 	sender := make(chan string)
@@ -78,10 +85,13 @@ loop:
 		select {
 		case msg := <-sender:
 			conn.Send(taps.NewMessage(msg, ""))
+			check(err)
 		case <-quitter:
+			fmt.Println()
 			break loop
 		}
 	}
 
 	conn.Close()
+	check(err)
 }

@@ -5,20 +5,24 @@ import (
 	"net"
 
 	quic "github.com/lucas-clemente/quic-go"
+	"github.com/scionproto/scion/go/lib/snet"
 )
 
 //
 
 const (
-	SERV_NONE = 1
-	SERV_TCP  = 2
-	SERV_QUIC = 3
+	SERV_NONE  = 1
+	SERV_TCP   = 2
+	SERV_QUIC  = 3
+	SERV_SCION = 4
 
-	KEYPAIR = "keypair"
+	KEYPAIR   = "keypair"
+	NAGLE_ON  = "nagle_on"
+	NAGLE_OFF = "nagle_off"
 )
 
 var (
-	SERV_NAMES = []string{"none (invalid)", "none", "tcp", "quic"}
+	SERV_NAMES = []string{"none (invalid)", "none", "tcp", "quic", "scion"}
 )
 
 //
@@ -28,6 +32,8 @@ type Endpoint struct {
 	serviceType   int
 	port          string
 	ipv4address   string
+	// ipv6address   string
+	// scionAddress  string
 }
 
 type LocalEndpoint struct {
@@ -39,7 +45,9 @@ type RemoteEndpoint struct {
 	hostName string
 }
 
-type TransportProperties struct{}
+type TransportProperties struct {
+	nagle bool
+}
 
 type SecurityParameters struct {
 	privateKey *rsa.PrivateKey
@@ -64,29 +72,14 @@ type Listener struct {
 type Connection struct {
 	nconn   net.Conn
 	qconn   quic.Session
+	sconn   *snet.Conn
 	preconn *Preconnection
 	active  bool
 	Err     error
+	saddr   net.Addr
 }
 
 type Message struct {
 	Data    string
 	Context string
 }
-
-// type interf interface {
-// 	(endPo *Endpoint) WithInterface(interfaceName string)
-// 	(endPo *Endpoint) WithPort(port string)
-// 	(endPo *Endpoint) WithIPv4Address(addr string)
-// 	(endPo *Endpoint) WithService(serviceType string)
-// 	(remEndPo *RemoteEndpoint) WithHostname(hostName string)
-// 	(tranProp *TransportProperties) Require(method string)
-// 	(secParam *SecurityParameters) Set(id string, list ...int)
-// 	(preconn *Preconnection) Listen() *Listener
-// 	(preconn *Preconnection) Initiate() *Connection
-// 	(lis *Listener) Stop()
-// 	(conn *Connection) Clone() *Connection
-// 	(conn *Connection) Receive() *Message
-// 	(conn *Connection) Send(msg *Message)
-// 	(conn *Connection) Close()
-// }

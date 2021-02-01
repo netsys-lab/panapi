@@ -14,6 +14,7 @@ var (
 	errUnknownSetName          = errors.New("unknown name for set target")
 	errReadOnClosedConnection  = errors.New("read on closed connection")
 	errWriteOnClosedConnection = errors.New("write on closed connection")
+	errNoClientAddr            = errors.New("no address for client")
 )
 
 type tapsError struct {
@@ -30,7 +31,9 @@ type tapsError struct {
 	Err error
 }
 
-func (e *tapsError) Unwrap() error { return e.Err }
+func (e *tapsError) Unwrap() error {
+	return e.Err
+}
 
 func (e *tapsError) Error() string {
 	if e == nil {

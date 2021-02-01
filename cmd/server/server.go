@@ -12,12 +12,6 @@ import (
 	"code.ovgu.de/hausheer/taps-api/taps"
 )
 
-// (http anfrage händisch)
-// flag: service port ip4 -> done
-// jedes symbol übertragen -> done, non portable
-// setnodelay tcp -> is default
-// tls nach set -> done
-// error handling
 // scion bsp
 
 func check(err error) {
@@ -33,7 +27,7 @@ func main() {
 
 	var err error
 
-	servF := flag.String("serv", "tcp", "tcp or quic")
+	servF := flag.String("serv", "tcp", "tcp or quic or scion")
 	ipF := flag.String("ip", "127.0.0.1", "ip address")
 	portF := flag.String("port", "1111", "port")
 	interF := flag.String("inter", "any", "interface name")
@@ -50,12 +44,13 @@ func main() {
 	check(err)
 
 	transProp := taps.NewTransportProperties()
+	// transProp.Require(taps.NAGLE_ON)
 
 	privatKey, err := rsa.GenerateKey(rand.Reader, 1024)
 	check(err)
 
 	secParam := taps.NewSecurityParameters()
-	err = secParam.Set("keypair", privatKey, &privatKey.PublicKey)
+	err = secParam.Set(taps.KEYPAIR, privatKey, &privatKey.PublicKey)
 	check(err)
 
 	preconn, err := taps.NewPreconnection(serv, transProp, secParam)
@@ -96,12 +91,15 @@ loop:
 				}
 			}()
 		case msg := <-sender:
-			conn.Send(taps.NewMessage(msg, ""))
+			err = conn.Send(taps.NewMessage(msg, ""))
+			check(err)
 		case <-quitter:
+			fmt.Println()
 			lis.Stop()
 			break loop
 		}
 	}
 
 	conn.Close()
+	check(err)
 }

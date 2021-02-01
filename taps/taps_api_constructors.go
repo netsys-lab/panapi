@@ -4,6 +4,7 @@ import (
 	"net"
 
 	quic "github.com/lucas-clemente/quic-go"
+	"github.com/scionproto/scion/go/lib/snet"
 )
 
 //
@@ -47,6 +48,8 @@ func NewListener(lis interface{}, preconn *Preconnection) (*Listener, error) {
 		ret = &Listener{lis.(net.Listener), nil, preconn, connChan, state}
 	case SERV_QUIC:
 		ret = &Listener{nil, lis.(quic.Listener), preconn, connChan, state}
+	case SERV_SCION:
+		ret = &Listener{nil, nil, preconn, connChan, state}
 	}
 	return ret, nil
 }
@@ -60,9 +63,11 @@ func NewConnection(conn interface{}, preconn *Preconnection) (*Connection, error
 	state := (conn != nil)
 	switch servType {
 	case SERV_TCP:
-		ret = &Connection{conn.(net.Conn), nil, preconn, state, nil}
+		ret = &Connection{conn.(net.Conn), nil, nil, preconn, state, nil, nil}
 	case SERV_QUIC:
-		ret = &Connection{nil, conn.(quic.Session), preconn, state, nil}
+		ret = &Connection{nil, conn.(quic.Session), nil, preconn, state, nil, nil}
+	case SERV_SCION:
+		ret = &Connection{nil, nil, conn.(*snet.Conn), preconn, state, nil, nil}
 	}
 	return ret, nil
 }

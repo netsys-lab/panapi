@@ -8,7 +8,7 @@ import (
 //
 
 func (preconn *Preconnection) tpcListen() (*Listener, error) {
-	nlis, err := net.Listen("tcp", preconn.locEnd.ipv4address+":"+preconn.locEnd.port)
+	nlis, err := net.Listen("tcp", "["+preconn.locEnd.ipv4address+"]:"+preconn.locEnd.port)
 	if err != nil {
 		return nil, &tapsError{Op: "tpcListen", Err: err}
 	}
@@ -22,6 +22,7 @@ func (preconn *Preconnection) tpcListen() (*Listener, error) {
 			lis.ConnRec <- Connection{Err: err}
 			return
 		}
+		nconn.(*net.TCPConn).SetNoDelay(!preconn.transProp.nagle)
 		conn, err := NewConnection(nconn, preconn)
 		if err != nil {
 			lis.ConnRec <- Connection{Err: err}
@@ -33,11 +34,12 @@ func (preconn *Preconnection) tpcListen() (*Listener, error) {
 }
 
 func (preconn *Preconnection) tcpInitiate() (*Connection, error) {
-	conn, err := net.Dial("tcp", preconn.remEnd.hostName+":"+preconn.remEnd.port)
+	nconn, err := net.Dial("tcp", "["+preconn.remEnd.ipv4address+"]:"+preconn.remEnd.port)
 	if err != nil {
 		return nil, &tapsError{Op: "tcpInitiate", Err: err}
 	}
-	return NewConnection(conn, preconn)
+	nconn.(*net.TCPConn).SetNoDelay(!preconn.transProp.nagle)
+	return NewConnection(nconn, preconn)
 }
 
 func (lis *Listener) tcpStop() error {
@@ -50,10 +52,11 @@ func (conn *Connection) tcpReceive() (*Message, error) {
 	if conn.isOpen() {
 		_, err := conn.nconn.Read(buf)
 		if err != nil && err != io.EOF && conn.isOpen() {
-			err2 := conn.Close()
-			if err2 != nil {
-				return nil, &tapsError{Op: "tcpReceive", Err: err2}
-			}
+			// err2 :=
+			conn.Close()
+			// if err2 != nil {
+			// 	return nil, &tapsError{Op: "tcpReceive", Err: err2}
+			// }
 			return nil, &tapsError{Op: "tcpReceive", Err: err}
 		}
 		return &Message{string(buf), "context"}, nil
