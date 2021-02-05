@@ -7,28 +7,25 @@ import (
 
 var (
 	errUnknownServiceType      = errors.New("unknown service type")
+	errNoServiceType           = errors.New("no service type set")
 	errInvalidPort             = errors.New("invalid port")
 	errInvalidIPAddress        = errors.New("invalid ip address")
 	errInvalidEndpointType     = errors.New("invalid endpoint type")
 	errInvalidArgument         = errors.New("invalid argument")
-	errUnknownSetName          = errors.New("unknown name for set target")
+	errUnknownSetName          = errors.New("unknown name for set")
+	errUnknownRequireName      = errors.New("unknown name for require")
 	errReadOnClosedConnection  = errors.New("read on closed connection")
 	errWriteOnClosedConnection = errors.New("write on closed connection")
 	errNoClientAddr            = errors.New("no address for client")
+	errInvalidAddressType      = errors.New("invalid address type")
 )
 
 type tapsError struct {
-	Op string
-
-	ServiceType int
-	Ipv4address string
-	Port        string
-
-	ServiceTypeInvalid string
-	ArgNum             int
-	SetName            string
-
-	Err error
+	Op     string
+	Endp   interface{}
+	ArgNum int
+	Desc   string
+	Err    error
 }
 
 func (e *tapsError) Unwrap() error {
@@ -39,25 +36,35 @@ func (e *tapsError) Error() string {
 	if e == nil {
 		return "<nil>"
 	}
-	s := e.Op + ": "
-	if e.ServiceType != 0 {
-		s += "service type: " + SERV_NAMES[e.ServiceType] + ", "
+	s := "@" + e.Op + " -> " + e.Err.Error() + "\n"
+	var ep *Endpoint
+	switch e.Endp.(type) {
+	case *LocalEndpoint:
+		ep = &e.Endp.(*LocalEndpoint).Endpoint
+	case *RemoteEndpoint:
+		ep = &e.Endp.(*RemoteEndpoint).Endpoint
+	case *Endpoint:
+		ep = e.Endp.(*Endpoint)
 	}
-	if e.ServiceTypeInvalid != "" {
-		s += "service sype: " + e.ServiceTypeInvalid + ", "
-	}
-	if e.Ipv4address != "" {
-		s += "IPv4 address: " + e.Ipv4address + ", "
-	}
-	if e.Port != "" {
-		s += "port: " + e.Port
+	if ep != nil {
+		if ep.interfaceName != "" {
+			s += "\t" + "interface name: " + ep.interfaceName + "\n"
+		}
+		if ep.serviceType != SERV_INVALID {
+			s += "\t" + "service type: " + SERV_NAMES[ep.serviceType] + "\n"
+		}
+		if ep.address != "" {
+			s += "\t" + "address: " + ep.address + "\n"
+		}
+		if ep.port != "" {
+			s += "\t" + "port: " + ep.port + "\n"
+		}
 	}
 	if e.ArgNum > 0 {
-		s += "argument number: " + strconv.Itoa(e.ArgNum)
+		s += "\t" + strconv.Itoa(e.ArgNum) + ". argument" + "\n"
 	}
-	if e.SetName != "" {
-		s += "target: " + e.SetName
+	if e.Desc != "" {
+		s += "\t" + "given value: " + e.Desc + "\n"
 	}
-	s += " -> " + e.Err.Error()
 	return s
 }

@@ -3,16 +3,12 @@ package main
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"code.ovgu.de/hausheer/taps-api/taps"
 )
-
-// scion bsp
 
 func check(err error) {
 	if err != nil {
@@ -22,25 +18,18 @@ func check(err error) {
 }
 
 func main() {
-	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-	defer exec.Command("stty", "-F", "/dev/tty", "echo").Run()
-
 	var err error
 
-	servF := flag.String("serv", "tcp", "tcp or quic or scion")
-	ipF := flag.String("ip", "127.0.0.1", "ip address")
-	portF := flag.String("port", "1111", "port")
-	interF := flag.String("inter", "any", "interface name")
-	flag.Parse()
+	servF, addrF, portF, interF := taps.Init()
 
-	serv := taps.NewLocalEndpoint()
-	err = serv.WithInterface(*interF)
+	ser := taps.NewLocalEndpoint()
+	err = ser.WithInterface(*interF)
 	check(err)
-	err = serv.WithService(*servF)
+	err = ser.WithService(*servF)
 	check(err)
-	err = serv.WithIPv4Address(*ipF)
+	err = ser.WithAddress(*addrF)
 	check(err)
-	err = serv.WithPort(*portF)
+	err = ser.WithPort(*portF)
 	check(err)
 
 	transProp := taps.NewTransportProperties()
@@ -48,14 +37,13 @@ func main() {
 
 	privatKey, err := rsa.GenerateKey(rand.Reader, 1024)
 	check(err)
-
 	secParam := taps.NewSecurityParameters()
-	err = secParam.Set(taps.KEYPAIR, privatKey, &privatKey.PublicKey)
+	// err = secParam.Set("keypair", 1, &privatKey.PublicKey)
+	err = secParam.Set("keypair", privatKey, &privatKey.PublicKey)
 	check(err)
 
-	preconn, err := taps.NewPreconnection(serv, transProp, secParam)
+	preconn, err := taps.NewPreconnection(ser, transProp, secParam)
 	check(err)
-
 	lis, err := preconn.Listen()
 	check(err)
 

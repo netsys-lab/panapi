@@ -8,13 +8,19 @@ import (
 //
 
 func (preconn *Preconnection) tpcListen() (*Listener, error) {
-	nlis, err := net.Listen("tcp", "["+preconn.locEnd.ipv4address+"]:"+preconn.locEnd.port)
+	nlis, err := net.Listen("tcp", "["+preconn.locEnd.address+"]:"+preconn.locEnd.port)
 	if err != nil {
-		return nil, &tapsError{Op: "tpcListen", Err: err}
+		return nil, &tapsError{
+			Op:   "tpcListen",
+			Endp: preconn.locEnd,
+			Err:  err}
 	}
 	lis, err := NewListener(nlis, preconn)
 	if err != nil {
-		return nil, &tapsError{Op: "tpcListen", Err: err}
+		return nil, &tapsError{
+			Op:   "tpcListen",
+			Endp: preconn,
+			Err:  err}
 	}
 	go func() {
 		nconn, err := lis.nlis.Accept()
@@ -34,9 +40,12 @@ func (preconn *Preconnection) tpcListen() (*Listener, error) {
 }
 
 func (preconn *Preconnection) tcpInitiate() (*Connection, error) {
-	nconn, err := net.Dial("tcp", "["+preconn.remEnd.ipv4address+"]:"+preconn.remEnd.port)
+	nconn, err := net.Dial("tcp", "["+preconn.remEnd.address+"]:"+preconn.remEnd.port)
 	if err != nil {
-		return nil, &tapsError{Op: "tcpInitiate", Err: err}
+		return nil, &tapsError{
+			Op:   "tcpInitiate",
+			Endp: preconn,
+			Err:  err}
 	}
 	nconn.(*net.TCPConn).SetNoDelay(!preconn.transProp.nagle)
 	return NewConnection(nconn, preconn)
@@ -52,12 +61,11 @@ func (conn *Connection) tcpReceive() (*Message, error) {
 	if conn.isOpen() {
 		_, err := conn.nconn.Read(buf)
 		if err != nil && err != io.EOF && conn.isOpen() {
-			// err2 :=
 			conn.Close()
-			// if err2 != nil {
-			// 	return nil, &tapsError{Op: "tcpReceive", Err: err2}
-			// }
-			return nil, &tapsError{Op: "tcpReceive", Err: err}
+			return nil, &tapsError{
+				Op:   "tcpReceive",
+				Endp: conn.preconn,
+				Err:  err}
 		}
 		return &Message{string(buf), "context"}, nil
 	}
@@ -68,15 +76,18 @@ func (conn *Connection) tcpSend(msg *Message) error {
 	if conn.isOpen() {
 		_, err := conn.nconn.Write([]byte(msg.Data))
 		if err != nil {
-			err2 := conn.Close()
-			if err2 != nil {
-				return &tapsError{Op: "tcpSend", Err: err2}
-			}
-			return &tapsError{Op: "tcpSend", Err: err}
+			conn.Close()
+			return &tapsError{
+				Op:   "tcpSend",
+				Endp: conn.preconn,
+				Err:  err}
 		}
 		return nil
 	}
-	return &tapsError{Op: "tcpSend", Err: errWriteOnClosedConnection}
+	return &tapsError{
+		Op:   "tcpSend",
+		Endp: conn.preconn,
+		Err:  errWriteOnClosedConnection}
 }
 
 func (conn *Connection) tcpClose() error {

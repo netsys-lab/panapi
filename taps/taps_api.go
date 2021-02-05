@@ -11,18 +11,20 @@ import (
 //
 
 const (
-	SERV_NONE  = 1
-	SERV_TCP   = 2
-	SERV_QUIC  = 3
-	SERV_SCION = 4
+	// serviceType
+	SERV_INVALID int = 0
+	SERV_NONE    int = 1
+	SERV_TCP     int = 2
+	SERV_QUIC    int = 3
+	SERV_SCION   int = 4
 
-	KEYPAIR   = "keypair"
-	NAGLE_ON  = "nagle_on"
-	NAGLE_OFF = "nagle_off"
+	KEYPAIR   string = "keypair"
+	NAGLE_ON  string = "nagle_on"
+	NAGLE_OFF string = "nagle_off"
 )
 
 var (
-	SERV_NAMES = []string{"none (invalid)", "none", "tcp", "quic", "scion"}
+	SERV_NAMES = []string{"invalid", "none", "tcp", "quic", "scion"}
 )
 
 //
@@ -31,7 +33,9 @@ type Endpoint struct {
 	interfaceName string
 	serviceType   int
 	port          string
-	ipv4address   string
+	address       string
+	hostname      string
+	// ipv4address   string
 	// ipv6address   string
 	// scionAddress  string
 }
@@ -42,7 +46,6 @@ type LocalEndpoint struct {
 
 type RemoteEndpoint struct {
 	Endpoint
-	hostName string
 }
 
 type TransportProperties struct {

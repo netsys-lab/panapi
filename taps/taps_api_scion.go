@@ -14,11 +14,17 @@ func (preconn *Preconnection) scionListen() (*Listener, error) {
 	port, err := strconv.ParseUint(preconn.locEnd.port, 10, 16)
 	sconn, err := appnet.ListenPort(uint16(port))
 	if err != nil && lis.isOpen() {
-		return nil, &tapsError{Op: "scionListen", Err: err}
+		return nil, &tapsError{
+			Op:   "scionListen",
+			Endp: preconn,
+			Err:  err}
 	}
 	conn, err := NewConnection(sconn, preconn)
 	if err != nil {
-		return nil, &tapsError{Op: "scionListen", Err: err}
+		return nil, &tapsError{
+			Op:   "scionListen",
+			Endp: preconn,
+			Err:  err}
 	}
 	go func() {
 		lis.ConnRec <- *conn
@@ -27,9 +33,12 @@ func (preconn *Preconnection) scionListen() (*Listener, error) {
 }
 
 func (preconn *Preconnection) scionInitiate() (*Connection, error) {
-	sconn, err := appnet.Dial(preconn.remEnd.ipv4address)
+	sconn, err := appnet.Dial(preconn.remEnd.address)
 	if err != nil {
-		return nil, &tapsError{Op: "scionInitiate", Err: err}
+		return nil, &tapsError{
+			Op:   "scionInitiate",
+			Endp: preconn,
+			Err:  err}
 	}
 	return NewConnection(sconn, preconn)
 }
@@ -42,7 +51,10 @@ func (conn *Connection) scionReceive() (*Message, error) {
 	buffer := make([]byte, 1024)
 	n, from, err := conn.sconn.ReadFrom(buffer)
 	if err != nil {
-		return nil, &tapsError{Op: "scionReceive", Err: err}
+		return nil, &tapsError{
+			Op:   "scionReceive",
+			Endp: conn.preconn,
+			Err:  err}
 	}
 	if conn.saddr == nil {
 		conn.saddr = from
@@ -56,28 +68,39 @@ func (conn *Connection) scionSend(msg *Message) error {
 	var err error
 	if conn.preconn.locEnd == nil {
 		if conn.preconn.remEnd != nil {
-			// client
 			addr = conn.sconn.RemoteAddr()
 		}
 	}
 	if conn.preconn.remEnd == nil {
 		if conn.preconn.locEnd != nil {
-			// server
 			if conn.saddr != nil {
 				addr = conn.saddr
 			} else {
-				return &tapsError{Op: "scionSend", Err: errNoClientAddr}
+				return &tapsError{
+					Op:   "scionSend",
+					Endp: conn.preconn,
+					Err:  errNoClientAddr}
 			}
 		}
 	}
 	_, err = conn.sconn.WriteTo([]byte(msg.Data), addr)
 	if err != nil {
-		return &tapsError{Op: "scionSend", Err: err}
+		conn.Close()
+		return &tapsError{
+			Op:   "scionSend",
+			Endp: conn.preconn,
+			Err:  err}
 	}
 	return nil
 }
 
 func (conn *Connection) scionClose() error {
 	err := conn.sconn.Close()
-	return &tapsError{Op: "scionClose", Err: err}
+	if err != nil {
+		return &tapsError{
+			Op:   "scionClose",
+			Endp: conn.preconn,
+			Err:  err}
+	}
+	return nil
 }

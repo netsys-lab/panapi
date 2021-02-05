@@ -34,9 +34,12 @@ func (preconn *Preconnection) generateTLSConfig() *tls.Config {
 
 func (preconn *Preconnection) quicListen() (*Listener, error) {
 	var lis *Listener
-	qlis, err := quic.ListenAddr("["+preconn.locEnd.ipv4address+"]:"+preconn.locEnd.port, preconn.generateTLSConfig(), nil)
+	qlis, err := quic.ListenAddr("["+preconn.locEnd.address+"]:"+preconn.locEnd.port, preconn.generateTLSConfig(), nil)
 	if err != nil {
-		return nil, &tapsError{Op: "quicListen", Err: err}
+		return nil, &tapsError{
+			Op:   "quicListen",
+			Endp: preconn,
+			Err:  err}
 	}
 	lis, err = NewListener(qlis, preconn)
 	go func() {
@@ -60,9 +63,12 @@ func (preconn *Preconnection) quicInitiate() (*Connection, error) {
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"taps-quic-test"},
 	}
-	session, err := quic.DialAddr("["+preconn.remEnd.ipv4address+"]:"+preconn.remEnd.port, tlsConf, nil)
+	session, err := quic.DialAddr("["+preconn.remEnd.address+"]:"+preconn.remEnd.port, tlsConf, nil)
 	if err != nil {
-		return nil, &tapsError{Op: "quicInitiate", Err: err}
+		return nil, &tapsError{
+			Op:   "quicInitiate",
+			Endp: preconn,
+			Err:  err}
 	}
 	return NewConnection(session, preconn)
 }
@@ -79,39 +85,45 @@ func (conn *Connection) quicReceive() (*Message, error) {
 	if conn.isOpen() {
 		stream, err := conn.qconn.AcceptUniStream(context.Background())
 		if err != nil {
-			err2 := conn.Close()
-			if err2 != nil {
-				return nil, &tapsError{Op: "quicReceive", Err: err2}
-			}
-			return nil, &tapsError{Op: "quicReceive", Err: err}
+			conn.Close()
+			return nil, &tapsError{
+				Op:   "quicReceive",
+				Endp: conn.preconn,
+				Err:  err}
 		}
 		_, err = stream.Read(buf)
 		if err != nil && conn.isOpen() {
-			err2 := conn.Close()
-			if err2 != nil {
-				return nil, &tapsError{Op: "quicReceive", Err: err2}
-			}
-			return nil, &tapsError{Op: "quicReceive", Err: err}
+			conn.Close()
+			return nil, &tapsError{
+				Op:   "quicReceive",
+				Endp: conn.preconn,
+				Err:  err}
 		}
 		return &Message{string(buf), "context"}, nil
 	}
-	return nil, &tapsError{Op: "quicReceive", Err: errReadOnClosedConnection}
+	return nil, &tapsError{
+		Op:   "quicReceive",
+		Endp: conn.preconn,
+		Err:  errReadOnClosedConnection}
 }
 
 func (conn *Connection) quicSend(msg *Message) error {
 	if conn.isOpen() {
 		stream, err := conn.qconn.OpenUniStreamSync(context.Background())
 		if err != nil {
-			err2 := conn.Close()
-			if err2 != nil {
-				return &tapsError{Op: "quicSend", Err: err2}
-			}
-			return &tapsError{Op: "quicSend", Err: err}
+			conn.Close()
+			return &tapsError{
+				Op:   "quicSend",
+				Endp: conn.preconn,
+				Err:  err}
 		}
 		stream.Write([]byte(msg.Data))
 		return nil
 	}
-	return &tapsError{Op: "quicSend", Err: errWriteOnClosedConnection}
+	return &tapsError{
+		Op:   "quicSend",
+		Endp: conn.preconn,
+		Err:  errWriteOnClosedConnection}
 }
 
 func (conn *Connection) quicClose() error {

@@ -2,6 +2,7 @@ package taps
 
 import (
 	"net"
+	"reflect"
 
 	quic "github.com/lucas-clemente/quic-go"
 	"github.com/scionproto/scion/go/lib/snet"
@@ -10,11 +11,15 @@ import (
 //
 
 func NewLocalEndpoint() *LocalEndpoint {
-	return &LocalEndpoint{Endpoint: Endpoint{serviceType: SERV_NONE}}
+	return &LocalEndpoint{
+		Endpoint: Endpoint{
+			serviceType: SERV_NONE}}
 }
 
 func NewRemoteEndpoint() *RemoteEndpoint {
-	return &RemoteEndpoint{Endpoint: Endpoint{serviceType: SERV_NONE}}
+	return &RemoteEndpoint{
+		Endpoint: Endpoint{
+			serviceType: SERV_NONE}}
 }
 
 func NewTransportProperties() *TransportProperties {
@@ -27,11 +32,24 @@ func NewSecurityParameters() *SecurityParameters {
 func NewPreconnection(endPo interface{}, transProp *TransportProperties, secParam *SecurityParameters) (*Preconnection, error) {
 	switch endPo.(type) {
 	case *LocalEndpoint:
-		return &Preconnection{endPo.(*LocalEndpoint), nil, transProp, secParam}, nil
+		return &Preconnection{
+				locEnd:    endPo.(*LocalEndpoint),
+				remEnd:    nil,
+				transProp: transProp,
+				secParam:  secParam},
+			nil
 	case *RemoteEndpoint:
-		return &Preconnection{nil, endPo.(*RemoteEndpoint), transProp, secParam}, nil
+		return &Preconnection{
+				locEnd:    nil,
+				remEnd:    endPo.(*RemoteEndpoint),
+				transProp: transProp,
+				secParam:  secParam},
+			nil
 	default:
-		return nil, &tapsError{Op: "NewPreconnection", Err: errInvalidEndpointType}
+		return nil, &tapsError{
+			Op:   "NewPreconnection",
+			Desc: reflect.TypeOf(endPo).String(),
+			Err:  errInvalidEndpointType}
 	}
 }
 
@@ -45,11 +63,26 @@ func NewListener(lis interface{}, preconn *Preconnection) (*Listener, error) {
 	connChan := make(chan Connection)
 	switch servType {
 	case SERV_TCP:
-		ret = &Listener{lis.(net.Listener), nil, preconn, connChan, state}
+		ret = &Listener{
+			nlis:    lis.(net.Listener),
+			qlis:    nil,
+			preconn: preconn,
+			ConnRec: connChan,
+			active:  state}
 	case SERV_QUIC:
-		ret = &Listener{nil, lis.(quic.Listener), preconn, connChan, state}
+		ret = &Listener{
+			nlis:    nil,
+			qlis:    lis.(quic.Listener),
+			preconn: preconn,
+			ConnRec: connChan,
+			active:  state}
 	case SERV_SCION:
-		ret = &Listener{nil, nil, preconn, connChan, state}
+		ret = &Listener{
+			nlis:    nil,
+			qlis:    nil,
+			preconn: preconn,
+			ConnRec: connChan,
+			active:  state}
 	}
 	return ret, nil
 }
@@ -63,15 +96,38 @@ func NewConnection(conn interface{}, preconn *Preconnection) (*Connection, error
 	state := (conn != nil)
 	switch servType {
 	case SERV_TCP:
-		ret = &Connection{conn.(net.Conn), nil, nil, preconn, state, nil, nil}
+		ret = &Connection{
+			nconn:   conn.(net.Conn),
+			qconn:   nil,
+			sconn:   nil,
+			preconn: preconn,
+			active:  state,
+			Err:     nil,
+			saddr:   nil}
 	case SERV_QUIC:
-		ret = &Connection{nil, conn.(quic.Session), nil, preconn, state, nil, nil}
+		ret = &Connection{
+			nconn:   nil,
+			qconn:   conn.(quic.Session),
+			sconn:   nil,
+			preconn: preconn,
+			active:  state,
+			Err:     nil,
+			saddr:   nil}
 	case SERV_SCION:
-		ret = &Connection{nil, nil, conn.(*snet.Conn), preconn, state, nil, nil}
+		ret = &Connection{
+			nconn:   nil,
+			qconn:   nil,
+			sconn:   conn.(*snet.Conn),
+			preconn: preconn,
+			active:  state,
+			Err:     nil,
+			saddr:   nil}
 	}
 	return ret, nil
 }
 
 func NewMessage(msg string, ctx string) *Message {
-	return &Message{msg, ctx}
+	return &Message{
+		Data:    msg,
+		Context: ctx}
 }
