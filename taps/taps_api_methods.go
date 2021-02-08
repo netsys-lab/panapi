@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"reflect"
 	"strconv"
+
+	"github.com/netsec-ethz/scion-apps/pkg/appnet"
 )
 
 //
@@ -39,14 +41,15 @@ func (endPo *Endpoint) WithInterface(interfaceName string) error {
 	return err
 }
 
-func (endPo *Endpoint) WithService(serviceType string) error {
+// todo
+func (endPo *Endpoint) WithNetType(serviceType string) error {
 	switch serviceType {
-	case "tcp":
-		endPo.serviceType = SERV_TCP
 	case "quic":
-		endPo.serviceType = SERV_QUIC
+		endPo.listener = net.Listener
+		// endPo.netType = SERV_QUIC
 	case "scion":
-		endPo.serviceType = SERV_SCION
+		endPo.listener = nil
+
 	default:
 		return &tapsError{
 			Op:   "WithService",
@@ -77,32 +80,42 @@ func (endPo *Endpoint) WithPort(port string) error {
 	return nil
 }
 
-// func (endPo *Endpoint) WithIPv4Address(addr string) error {
-// 	if net.ParseIP(addr) == nil {
-// 		return &tapsError{
-// 			Op:   "WithIPv4Address",
-// 			Endp: endPo,
-// 			Err:  errInvalidIPAddress}
-// 	}
-// 	endPo.address = addr
-// 	return nil
-// }
+func (endPo *Endpoint) WithIPv4Address(addr string) error {
+	if net.ParseIP(addr) == nil {
+		return &tapsError{
+			Op:   "WithIPv4Address",
+			Endp: endPo,
+			Desc: addr,
+			Err:  errInvalidIPAddress}
+	}
+	endPo.address = addr
+	return nil
+}
 
-// func (endPo *Endpoint) WithIPv6Address(addr string) error {
-// 	if net.ParseIP(addr) == nil {
-// 		return &tapsError{
-// 			Op:   "WithIPv6Address",
-// 			Endp: endPo,
-// 			Err:  errInvalidIPAddress}
-// 	}
-// 	endPo.address = addr
-// 	return nil
-// }
+func (endPo *Endpoint) WithIPv6Address(addr string) error {
+	if net.ParseIP(addr) == nil {
+		return &tapsError{
+			Op:   "WithIPv6Address",
+			Endp: endPo,
+			Desc: addr,
+			Err:  errInvalidIPAddress}
+	}
+	endPo.address = addr
+	return nil
+}
 
-// func (endPo *Endpoint) WithScionAddress(addr string) error {
-// 	endPo.address = addr
-// 	return nil
-// }
+func (endPo *Endpoint) WithScionAddress(addr string) error {
+	_, err := appnet.ResolveUDPAddrAt(addr, appnet.DefaultResolver())
+	if err != nil {
+		return &tapsError{
+			Op:   "WithScionAddress",
+			Endp: endPo,
+			Desc: addr,
+			Err:  err}
+	}
+	endPo.address = addr
+	return nil
+}
 
 func (endPo *Endpoint) WithHostname(hostname string) error {
 	endPo.hostname = hostname
@@ -118,26 +131,23 @@ func (endPo *Endpoint) WithHostname(hostname string) error {
 }
 
 func (endPo *Endpoint) WithAddress(addr string) error {
-	endPo.address = addr
-	return nil
-	// switch endPo.serviceType {
-	// case SERV_SCION:
-	// 	return endPo.WithScionAddress(addr)
-	// case SERV_TCP:
-	// case SERV_QUIC:
-	// 	for i := 0; i < len(addr); i++ {
-	// 		switch addr[i] {
-	// 		case '.':
-	// 			return endPo.WithIPv4Address(addr)
-	// 		case ':':
-	// 			return endPo.WithIPv6Address(addr)
-	// 		}
-	// 	}
-	// }
-	// return &tapsError{
-	// 	Op:   "WithAddress",
-	// 	Desc: addr,
-	// 	Err:  errInvalidAddressType}
+	for i := 0; i < len(addr); i++ {
+		if addr[i] == ',' {
+			return endPo.WithScionAddress(addr)
+		}
+	}
+	for i := 0; i < len(addr); i++ {
+		switch addr[i] {
+		case '.':
+			return endPo.WithIPv4Address(addr)
+		case ':':
+			return endPo.WithIPv6Address(addr)
+		}
+	}
+	return &tapsError{
+		Op:   "WithAddress",
+		Desc: addr,
+		Err:  errInvalidAddressType}
 }
 
 //
@@ -202,13 +212,21 @@ func (preconn *Preconnection) Listen() (*Listener, error) {
 			Err:  err}
 	}
 	var lis *Listener
-	switch servType {
+	switch transType {
 	case SERV_TCP:
 		lis, err = preconn.tpcListen()
 	case SERV_QUIC:
 		lis, err = preconn.quicListen()
-	case SERV_SCION:
-		lis, err = preconn.scionListen()
+	case NET_SCION:
+		switch netType {
+		case TRANS_UDP:
+			lis, err = preconn.scionListen()
+		case TRANS_QUIC:
+			return nil, &tapsError{
+				Op:   "Listen",
+				Endp: preconn,
+				Err:  errNotImplemented}
+		}
 	}
 	return lis, err
 }

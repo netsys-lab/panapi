@@ -1,15 +1,17 @@
-package taps
+package scion
 
 import (
 	"net"
 	"strconv"
 
+	"code.ovgu.de/hausheer/taps-api/taps"
 	"github.com/netsec-ethz/scion-apps/pkg/appnet"
 )
 
-//
+// scion udp
 
-func (preconn *Preconnection) scionListen() (*Listener, error) {
+func (preconn *taps.Preconnection) Listen() (*Listener, error) {
+
 	lis, err := NewListener(nil, preconn)
 	port, err := strconv.ParseUint(preconn.locEnd.port, 10, 16)
 	sconn, err := appnet.ListenPort(uint16(port))

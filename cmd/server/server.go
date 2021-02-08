@@ -22,10 +22,23 @@ func main() {
 
 	servF, addrF, portF, interF := taps.Init()
 
+	/*
+	   http[s] / ftp       : WithService
+	   udp / tcp / quic    : WithTransport
+	   ip / scion          : WithNetType
+	   ...
+
+
+
+	   ival: scion-tcp scion-quic ip-udp
+	*/
+
 	ser := taps.NewLocalEndpoint()
 	err = ser.WithInterface(*interF)
 	check(err)
-	err = ser.WithService(*servF)
+	err = ser.WithNetType("scion ip")
+	check(err)
+	err = ser.WithTranport("quic udp tcp")
 	check(err)
 	err = ser.WithAddress(*addrF)
 	check(err)
@@ -38,7 +51,6 @@ func main() {
 	privatKey, err := rsa.GenerateKey(rand.Reader, 1024)
 	check(err)
 	secParam := taps.NewSecurityParameters()
-	// err = secParam.Set("keypair", 1, &privatKey.PublicKey)
 	err = secParam.Set("keypair", privatKey, &privatKey.PublicKey)
 	check(err)
 

@@ -11,12 +11,16 @@ import (
 //
 
 const (
-	// serviceType
-	SERV_INVALID int = 0
-	SERV_NONE    int = 1
-	SERV_TCP     int = 2
-	SERV_QUIC    int = 3
-	SERV_SCION   int = 4
+	TRANS_INVALID = iota
+	TRANS_NONE
+	TRANS_UDP
+	TRANS_TCP
+	TRANS_QUIC
+
+	NET_INVALID
+	NET_NONE
+	NET_SCION
+	NET_IP
 
 	KEYPAIR   string = "keypair"
 	NAGLE_ON  string = "nagle_on"
@@ -31,7 +35,7 @@ var (
 
 type Endpoint struct {
 	interfaceName string
-	serviceType   int
+	listener      net.Listener
 	port          string
 	address       string
 	hostname      string
