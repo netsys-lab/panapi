@@ -1,92 +1,117 @@
 package taps
 
 import (
-	"crypto/rsa"
-	"net"
-
-	quic "github.com/lucas-clemente/quic-go"
-	"github.com/scionproto/scion/go/lib/snet"
+	"code.ovgu.de/hausheer/taps-api/ip"
+	"code.ovgu.de/hausheer/taps-api/network"
+	"code.ovgu.de/hausheer/taps-api/scion"
+	"errors"
 )
 
-//
-
 const (
-	TRANS_INVALID = iota
-	TRANS_NONE
-	TRANS_UDP
-	TRANS_TCP
-	TRANS_QUIC
+	NETWORK_IP    = "IP"
+	NETWORK_IPV4  = "IPv4"
+	NETWORK_IPV6  = "IPv6"
+	NETWORK_SCION = "SCION"
 
-	NET_INVALID
-	NET_NONE
-	NET_SCION
-	NET_IP
-
-	KEYPAIR   string = "keypair"
-	NAGLE_ON  string = "nagle_on"
-	NAGLE_OFF string = "nagle_off"
+	TRANSPORT_UDP  = "UDP"
+	TRANSPORT_TCP  = "TCP"
+	TRANSPORT_QUIC = "QUIC"
 )
 
 var (
-	SERV_NAMES = []string{"invalid", "none", "tcp", "quic", "scion"}
+	errNetworkType    = errors.New("invalid network type")
+	errTransportType  = errors.New("invalid address type")
+	errNotImplemented = errors.New("not (yet) supported")
 )
 
-//
+type Message string
 
-type Endpoint struct {
-	interfaceName string
-	listener      net.Listener
-	port          string
-	address       string
-	hostname      string
-	// ipv4address   string
-	// ipv6address   string
-	// scionAddress  string
+func (m Message) String() string {
+	return string(m)
 }
 
-type LocalEndpoint struct {
-	Endpoint
+func NewRemoteEndpoint() *network.Endpoint {
+	return &network.Endpoint{Local: false}
 }
 
-type RemoteEndpoint struct {
-	Endpoint
-}
-
-type TransportProperties struct {
-	nagle bool
-}
-
-type SecurityParameters struct {
-	privateKey *rsa.PrivateKey
-	publicKey  *rsa.PublicKey
+func NewLocalEndpoint() *network.Endpoint {
+	return &network.Endpoint{Local: true}
 }
 
 type Preconnection struct {
-	locEnd    *LocalEndpoint
-	remEnd    *RemoteEndpoint
-	transProp *TransportProperties
-	secParam  *SecurityParameters
+	endpoint *network.Endpoint
+	listener network.Listener
+	dialer   network.Dialer
 }
 
-type Listener struct {
-	nlis    net.Listener
-	qlis    quic.Listener
-	preconn *Preconnection
-	ConnRec chan Connection
-	active  bool
+// TODO, detect closed connections, do failure recovery
+func (p Preconnection) Listen() chan network.Connection {
+	c := make(chan network.Connection)
+	go func(c chan network.Connection, listener network.Listener) {
+		for {
+			conn, err := listener.Listen()
+			if err != nil {
+				// FIXME TODO
+				panic(err)
+			}
+			c <- conn
+		}
+	}(c, p.listener)
+	return c
 }
 
-type Connection struct {
-	nconn   net.Conn
-	qconn   quic.Session
-	sconn   *snet.Conn
-	preconn *Preconnection
-	active  bool
-	Err     error
-	saddr   net.Addr
+func (p Preconnection) Initiate() network.Connection {
+	conn, err := p.dialer.Dial()
+	if err != nil {
+		panic(err)
+	}
+	return conn
 }
 
-type Message struct {
-	Data    string
-	Context string
+func NewPreconnection(e *network.Endpoint) (Preconnection, error) {
+	var (
+		listener network.Listener
+		dialer   network.Dialer
+		network  network.Network
+		p        Preconnection
+		err      error
+	)
+	switch e.Transport {
+	case TRANSPORT_UDP:
+	case TRANSPORT_TCP:
+	case TRANSPORT_QUIC:
+		return p, errNotImplemented
+	default:
+		return p, errTransportType
+	}
+
+	switch e.Network {
+	case NETWORK_IP:
+		fallthrough
+	case NETWORK_IPV4:
+		fallthrough
+	case NETWORK_IPV6:
+		network = ip.Network()
+	case NETWORK_SCION:
+		network = scion.Network()
+	default:
+		return p, errNetworkType
+	}
+
+	if e.Local {
+		listener, err = network.NewListener(e)
+	} else {
+		dialer, err = network.NewDialer(e)
+	}
+
+	if err != nil {
+		return p, err
+	}
+
+	p = Preconnection{
+		endpoint: e,
+		listener: listener,
+		dialer:   dialer,
+	}
+	return p, err
 }

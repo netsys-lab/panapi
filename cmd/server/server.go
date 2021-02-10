@@ -1,105 +1,33 @@
 package main
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"fmt"
-	"os"
-	"strings"
-
 	"code.ovgu.de/hausheer/taps-api/taps"
+	"log"
 )
 
-func check(err error) {
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-}
-
 func main() {
-	var err error
+	LocalSpecifier := taps.NewLocalEndpoint()
+	LocalSpecifier.WithNetwork(taps.NETWORK_IP)
+	LocalSpecifier.WithTransport(taps.TRANSPORT_TCP)
+	LocalSpecifier.WithAddress(":1337")
 
-	servF, addrF, portF, interF := taps.Init()
-
-	/*
-	   http[s] / ftp       : WithService
-	   udp / tcp / quic    : WithTransport
-	   ip / scion          : WithNetType
-	   ...
-
-
-
-	   ival: scion-tcp scion-quic ip-udp
-	*/
-
-	ser := taps.NewLocalEndpoint()
-	err = ser.WithInterface(*interF)
-	check(err)
-	err = ser.WithNetType("scion ip")
-	check(err)
-	err = ser.WithTranport("quic udp tcp")
-	check(err)
-	err = ser.WithAddress(*addrF)
-	check(err)
-	err = ser.WithPort(*portF)
-	check(err)
-
-	transProp := taps.NewTransportProperties()
-	// transProp.Require(taps.NAGLE_ON)
-
-	privatKey, err := rsa.GenerateKey(rand.Reader, 1024)
-	check(err)
-	secParam := taps.NewSecurityParameters()
-	err = secParam.Set("keypair", privatKey, &privatKey.PublicKey)
-	check(err)
-
-	preconn, err := taps.NewPreconnection(ser, transProp, secParam)
-	check(err)
-	lis, err := preconn.Listen()
-	check(err)
-
-	quitter := make(chan bool)
-	sender := make(chan string)
-
-	go func() {
-		var b []byte = make([]byte, 1)
-		for {
-			os.Stdin.Read(b)
-			str := string(b)
-			// str, _ := bufio.NewReader(os.Stdin).ReadString('\n')
-			if strings.Contains(str, ".") {
-				quitter <- true
-			} else {
-				sender <- str
-			}
-		}
-	}()
-
-	var conn taps.Connection
-
-loop:
-	for {
-		select {
-		case conn = <-lis.ConnRec:
-			check(conn.Err)
-			go func() {
-				for {
-					msg, err := conn.Receive()
-					check(err)
-					fmt.Print(msg.Data)
-				}
-			}()
-		case msg := <-sender:
-			err = conn.Send(taps.NewMessage(msg, ""))
-			check(err)
-		case <-quitter:
-			fmt.Println()
-			lis.Stop()
-			break loop
-		}
+	Preconnection, err := taps.NewPreconnection(LocalSpecifier)
+	if err != nil {
+		log.Fatalf("Error! %s\n", err)
 	}
 
-	conn.Close()
-	check(err)
+	Listener := Preconnection.Listen()
+
+	Connection := <-Listener
+
+	Message, err := Connection.Receive()
+	if err != nil {
+		log.Printf("Error! %s\n", err)
+	}
+	log.Printf("Message: %v\n", Message)
+
+	err = Connection.Send(taps.Message("Got your message!\n"))
+	if err != nil {
+		log.Printf("Error! %s\n", err)
+	}
 }
