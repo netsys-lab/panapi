@@ -7,6 +7,7 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.Lshortfile)
 	LocalSpecifier := taps.NewLocalEndpoint()
 	// LocalSpecifier.WithNetwork(taps.NETWORK_IP)
 	// LocalSpecifier.WithAddress(":1234")
@@ -19,19 +20,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error! %s\n", err)
 	}
+	for {
+		Listener := Preconnection.Listen()
 
-	Listener := Preconnection.Listen()
+		Connection := <-Listener
 
-	Connection := <-Listener
+		Message, err := Connection.Receive()
+		if err != nil {
+			log.Printf("Error! %s\n", err)
+		}
+		log.Printf("Message: %v\n", Message)
 
-	Message, err := Connection.Receive()
-	if err != nil {
-		log.Printf("Error! %s\n", err)
-	}
-	log.Printf("Message: %v\n", Message)
-
-	err = Connection.Send(taps.Message("Got your message!\n"))
-	if err != nil {
-		log.Printf("Error! %s\n", err)
+		err = Connection.Send(taps.Message("Got your message!\n"))
+		if err != nil {
+			log.Printf("Error! %s\n", err)
+		}
 	}
 }
