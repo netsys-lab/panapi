@@ -8,9 +8,12 @@ import (
 
 func main() {
 	LocalSpecifier := taps.NewLocalEndpoint()
-	LocalSpecifier.WithNetwork(taps.NETWORK_IP)
+	// LocalSpecifier.WithNetwork(taps.NETWORK_IP)
+	// LocalSpecifier.WithAddress(":1234")
+	LocalSpecifier.WithNetwork(taps.NETWORK_SCION)
+	LocalSpecifier.WithAddress("19-ffaa:1:e9e,[127.0.0.1]:1234")
+	// LocalSpecifier.WithTransport(taps.TRANSPORT_UDP)
 	LocalSpecifier.WithTransport(taps.TRANSPORT_QUIC)
-	LocalSpecifier.WithAddress(":1337")
 
 	Preconnection, err := taps.NewPreconnection(LocalSpecifier)
 	if err != nil {

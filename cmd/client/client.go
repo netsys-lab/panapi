@@ -8,9 +8,12 @@ import (
 
 func main() {
 	RemoteSpecifier := taps.NewRemoteEndpoint()
-	RemoteSpecifier.WithNetwork(taps.NETWORK_IP)
+	// RemoteSpecifier.WithNetwork(taps.NETWORK_IP)
+	// RemoteSpecifier.WithAddress("[127.0.0.1]:1234")
+	RemoteSpecifier.WithNetwork(taps.NETWORK_SCION)
+	RemoteSpecifier.WithAddress("19-ffaa:1:e9e,[127.0.0.1]:1234")
+	// RemoteSpecifier.WithTransport(taps.TRANSPORT_UDP)
 	RemoteSpecifier.WithTransport(taps.TRANSPORT_QUIC)
-	RemoteSpecifier.WithAddress("[::1]:1337")
 
 	Preconnection, err := taps.NewPreconnection(RemoteSpecifier)
 	if err != nil {

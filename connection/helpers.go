@@ -38,9 +38,13 @@ func NewUDP(conn conn, laddr, raddr net.Addr) network.Connection {
 func (c *UDP) Send(message network.Message) error {
 	var err error
 	if !c.established {
+		fmt.Println("udp WriteTo start")
 		_, err = c.conn.WriteTo([]byte(message.String()), c.raddr)
+		fmt.Println("udp WriteTo end")
 	} else {
+		fmt.Println("udp Write start : raddr =", c.raddr)
 		_, err = c.conn.Write([]byte(message.String()))
+		fmt.Println("udp Write end")
 	}
 	return err
 }
@@ -52,8 +56,9 @@ func (c *UDP) Receive() (network.Message, error) {
 		err error
 	)
 	buffer := make([]byte, 1024)
+	fmt.Println("udp ReadFrom start")
 	n, c.raddr, err = c.conn.ReadFrom(buffer)
-	// log.Printf("%v", c.raddr)
+	fmt.Println("udp ReadFrom end : raddr = ", c.raddr.String())
 	m = message(string(buffer[:n]))
 	return &m, err
 }
@@ -97,9 +102,9 @@ func NewQUIC(conn quic.Session, stream quic.Stream, laddr, raddr net.Addr) netwo
 }
 
 func (c QUIC) Send(message network.Message) error {
-	fmt.Println("send: local:", c.conn.LocalAddr(), "remote:", c.conn.RemoteAddr())
+	fmt.Println("quic Write start : local:", c.conn.LocalAddr(), "remote:", c.conn.RemoteAddr())
 	c.stream.Write([]byte(message.String()))
-	fmt.Println("send done")
+	fmt.Println("quic Write end")
 	return nil
 }
 
@@ -110,9 +115,9 @@ func (c QUIC) Receive() (network.Message, error) {
 		err error
 	)
 	buffer := make([]byte, 1024)
-	fmt.Println("rec: local:", c.conn.LocalAddr(), "remote:", c.conn.RemoteAddr())
+	fmt.Println("quic Read start : local:", c.conn.LocalAddr(), "remote:", c.conn.RemoteAddr())
 	n, err = c.stream.Read(buffer)
-	fmt.Println("rec done")
+	fmt.Println("quic Read end")
 	if err != nil {
 		return nil, err
 	}
