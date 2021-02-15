@@ -147,11 +147,6 @@ func (l *QUICListener) Listen() (network.Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	buffer := make([]byte, 1)
-	_, err = stream.Read(buffer)
-	if err != nil {
-		return nil, err
-	}
 	return connection.NewQUIC(conn, stream, conn.LocalAddr(), conn.RemoteAddr()), err
 }
 
