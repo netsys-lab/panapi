@@ -1,12 +1,20 @@
 package ip
 
 import (
-	"code.ovgu.de/hausheer/taps-api/connection"
-	"code.ovgu.de/hausheer/taps-api/network"
+	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
-	"sync"
+
+	"code.ovgu.de/hausheer/taps-api/connection"
+	"code.ovgu.de/hausheer/taps-api/network"
+	"github.com/lucas-clemente/quic-go"
 )
 
 type UDPDialer struct {
@@ -31,7 +39,6 @@ func (d *UDPDialer) Dial() (network.Connection, error) {
 
 type UDPListener struct {
 	laddr *net.UDPAddr
-	mutex sync.Mutex
 }
 
 func NewUDPListener(address string) (*UDPListener, error) {
@@ -39,13 +46,10 @@ func NewUDPListener(address string) (*UDPListener, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &UDPListener{addr, sync.Mutex{}}, nil
+	return &UDPListener{addr}, nil
 }
 
 func (l *UDPListener) Listen() (network.Connection, error) {
-	l.mutex.Lock()
-	//defer l.mutex.Unlock()
-	//fmt.Printf("after %v", l.mutex)
 	conn, err := net.ListenUDP("udp", l.laddr)
 	if err != nil {
 		return nil, err
@@ -98,14 +102,72 @@ func (l *TCPListener) Listen() (network.Connection, error) {
 	return connection.NewTCP(conn, conn.LocalAddr(), conn.RemoteAddr()), err
 }
 
+type QUICDialer struct {
+	raddr string
+}
+
+func NewQUICDialer(address string) (*QUICDialer, error) {
+	return &QUICDialer{address}, nil
+}
+
+func (d *QUICDialer) Dial() (network.Connection, error) {
+	tlsConf := &tls.Config{
+		InsecureSkipVerify: true,
+		NextProtos:         []string{"taps-quic-test"},
+	}
+	conn, err := quic.DialAddr(d.raddr, tlsConf, nil)
+	if err != nil {
+		return nil, err
+	}
+	stream, err := conn.OpenStreamSync(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	return connection.NewQUIC(conn, stream, conn.LocalAddr(), conn.RemoteAddr()), err
+}
+
+type QUICListener struct {
+	listener quic.Listener
+}
+
+func NewQUICListener(address string) (*QUICListener, error) {
+	listener, err := quic.ListenAddr(address, generateTLSConfig(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return &QUICListener{listener}, nil
+}
+
+func (l *QUICListener) Listen() (network.Connection, error) {
+	conn, err := l.listener.Accept(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	stream, err := conn.AcceptStream(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	buffer := make([]byte, 1)
+	_, err = stream.Read(buffer)
+	if err != nil {
+		return nil, err
+	}
+	return connection.NewQUIC(conn, stream, conn.LocalAddr(), conn.RemoteAddr()), err
+}
+
 type ip struct{}
 
 func (ip *ip) NewListener(e *network.Endpoint) (network.Listener, error) {
 	switch e.Transport {
+	// case taps.TRANSPORT_UDP:
 	case "UDP":
 		return NewUDPListener(e.LocalAddress)
+	// case taps.TRANSPORT_TCP:
 	case "TCP":
 		return NewTCPListener(e.LocalAddress)
+	// case taps.TRANSPORT_QUIC:
+	case "QUIC":
+		return NewQUICListener(e.LocalAddress)
 	default:
 		return nil, errors.New(fmt.Sprintf("Transport %s not implemented for IP", e.Transport))
 	}
@@ -113,10 +175,15 @@ func (ip *ip) NewListener(e *network.Endpoint) (network.Listener, error) {
 
 func (ip *ip) NewDialer(e *network.Endpoint) (network.Dialer, error) {
 	switch e.Transport {
+	// case taps.TRANSPORT_UDP:
 	case "UDP":
 		return NewUDPDialer(e.RemoteAddress)
+	// case taps.TRANSPORT_TCP:
 	case "TCP":
 		return NewTCPDialer(e.RemoteAddress)
+	// case taps.TRANSPORT_QUIC:
+	case "QUIC":
+		return NewQUICDialer(e.RemoteAddress)
 	default:
 		return nil, errors.New(fmt.Sprintf("Transport %s not implemented for IP", e.Transport))
 	}
@@ -124,4 +191,23 @@ func (ip *ip) NewDialer(e *network.Endpoint) (network.Dialer, error) {
 
 func Network() network.Network {
 	return &ip{}
+}
+
+func generateTLSConfig() *tls.Config {
+	key, err := rsa.GenerateKey(rand.Reader, 1024)
+	template := x509.Certificate{SerialNumber: big.NewInt(1)}
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
+	if err != nil {
+		panic(err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		panic(err)
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{tlsCert},
+		NextProtos:   []string{"taps-quic-test"},
+	}
 }

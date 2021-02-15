@@ -1,15 +1,16 @@
 package main
 
 import (
-	"code.ovgu.de/hausheer/taps-api/taps"
 	"fmt"
+
+	"code.ovgu.de/hausheer/taps-api/taps"
 )
 
 func main() {
 	RemoteSpecifier := taps.NewRemoteEndpoint()
 	RemoteSpecifier.WithNetwork(taps.NETWORK_IP)
-	RemoteSpecifier.WithTransport(taps.TRANSPORT_TCP)
-	RemoteSpecifier.WithAddress("localhost:1337")
+	RemoteSpecifier.WithTransport(taps.TRANSPORT_QUIC)
+	RemoteSpecifier.WithAddress("[::1]:1337")
 
 	Preconnection, err := taps.NewPreconnection(RemoteSpecifier)
 	if err != nil {

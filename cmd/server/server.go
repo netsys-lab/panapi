@@ -1,14 +1,15 @@
 package main
 
 import (
-	"code.ovgu.de/hausheer/taps-api/taps"
 	"log"
+
+	"code.ovgu.de/hausheer/taps-api/taps"
 )
 
 func main() {
 	LocalSpecifier := taps.NewLocalEndpoint()
 	LocalSpecifier.WithNetwork(taps.NETWORK_IP)
-	LocalSpecifier.WithTransport(taps.TRANSPORT_TCP)
+	LocalSpecifier.WithTransport(taps.TRANSPORT_QUIC)
 	LocalSpecifier.WithAddress(":1337")
 
 	Preconnection, err := taps.NewPreconnection(LocalSpecifier)

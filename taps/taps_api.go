@@ -1,10 +1,11 @@
 package taps
 
 import (
+	"errors"
+
 	"code.ovgu.de/hausheer/taps-api/ip"
 	"code.ovgu.de/hausheer/taps-api/network"
 	"code.ovgu.de/hausheer/taps-api/scion"
-	"errors"
 )
 
 const (
@@ -48,14 +49,14 @@ type Preconnection struct {
 func (p Preconnection) Listen() chan network.Connection {
 	c := make(chan network.Connection)
 	go func(c chan network.Connection, listener network.Listener) {
-		for {
-			conn, err := listener.Listen()
-			if err != nil {
-				// FIXME TODO
-				panic(err)
-			}
-			c <- conn
+		// for {
+		conn, err := listener.Listen()
+		if err != nil {
+			// FIXME TODO
+			panic(err)
 		}
+		c <- conn
+		// }
 	}(c, p.listener)
 	return c
 }
@@ -80,17 +81,12 @@ func NewPreconnection(e *network.Endpoint) (Preconnection, error) {
 	case TRANSPORT_UDP:
 	case TRANSPORT_TCP:
 	case TRANSPORT_QUIC:
-		return p, errNotImplemented
 	default:
 		return p, errTransportType
 	}
 
 	switch e.Network {
-	case NETWORK_IP:
-		fallthrough
-	case NETWORK_IPV4:
-		fallthrough
-	case NETWORK_IPV6:
+	case NETWORK_IP, NETWORK_IPV4, NETWORK_IPV6:
 		network = ip.Network()
 	case NETWORK_SCION:
 		network = scion.Network()
