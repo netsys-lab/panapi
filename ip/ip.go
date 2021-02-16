@@ -34,7 +34,7 @@ func (d *UDPDialer) Dial() (network.Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	return connection.NewUDP(conn, conn.LocalAddr(), conn.RemoteAddr()), err
+	return connection.NewUDP(conn, conn.LocalAddr(), conn.RemoteAddr(), true), err
 }
 
 type UDPListener struct {
@@ -54,7 +54,7 @@ func (l *UDPListener) Listen() (network.Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	return connection.NewUDP(conn, conn.LocalAddr(), conn.RemoteAddr()), err
+	return connection.NewUDP(conn, conn.LocalAddr(), conn.RemoteAddr(), false), err
 }
 
 type TCPDialer struct {
@@ -115,15 +115,15 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"taps-quic-test"},
 	}
-	fmt.Println("ip quic DialAddr start")
+	// fmt.Println("ip quic DialAddr start")
 	conn, err := quic.DialAddr(d.raddr, tlsConf, nil)
-	fmt.Println("ip quic DialAddr end")
+	// fmt.Println("ip quic DialAddr end")
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("ip quic OpenStreamSync start")
+	// fmt.Println("ip quic OpenStreamSync start")
 	stream, err := conn.OpenStreamSync(context.Background())
-	fmt.Println("ip quic OpenStreamSync end")
+	// fmt.Println("ip quic OpenStreamSync end")
 	if err != nil {
 		return nil, err
 	}
@@ -135,9 +135,9 @@ type QUICListener struct {
 }
 
 func NewQUICListener(address string) (*QUICListener, error) {
-	fmt.Println("ip quic ListenAddr start")
+	// fmt.Println("ip quic ListenAddr start")
 	listener, err := quic.ListenAddr(address, generateTLSConfig(), nil)
-	fmt.Println("ip quic ListenAddr end")
+	// fmt.Println("ip quic ListenAddr end")
 	if err != nil {
 		return nil, err
 	}
@@ -145,15 +145,15 @@ func NewQUICListener(address string) (*QUICListener, error) {
 }
 
 func (l *QUICListener) Listen() (network.Connection, error) {
-	fmt.Println("ip quic Accept start")
+	// fmt.Println("ip quic Accept start")
 	conn, err := l.listener.Accept(context.Background())
-	fmt.Println("ip quic Accept end")
+	// fmt.Println("ip quic Accept end")
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("ip quic AcceptStream start")
+	// fmt.Println("ip quic AcceptStream start")
 	stream, err := conn.AcceptStream(context.Background())
-	fmt.Println("ip quic AcceptStream end")
+	// fmt.Println("ip quic AcceptStream end")
 	if err != nil {
 		return nil, err
 	}

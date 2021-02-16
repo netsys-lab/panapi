@@ -1,12 +1,10 @@
 package connection
 
 import (
-	"fmt"
 	"net"
 
 	"code.ovgu.de/hausheer/taps-api/network"
 	"github.com/lucas-clemente/quic-go"
-	//"github.com/scionproto/scion/go/lib/snet"
 )
 
 //conn includes the lowest common denominator of member functions of
@@ -25,26 +23,26 @@ func (m message) String() string {
 }
 
 type UDP struct {
-	conn        conn
-	laddr       net.Addr
-	raddr       net.Addr
-	established bool
+	conn  conn
+	laddr net.Addr
+	raddr net.Addr
+	write bool
 }
 
-func NewUDP(conn conn, laddr, raddr net.Addr) network.Connection {
-	return &UDP{conn, laddr, raddr, raddr != nil}
+func NewUDP(conn conn, laddr, raddr net.Addr, write bool) network.Connection {
+	return &UDP{conn, laddr, raddr, write}
 }
 
 func (c *UDP) Send(message network.Message) error {
 	var err error
-	if !c.established {
-		fmt.Println("udp WriteTo start")
-		_, err = c.conn.WriteTo([]byte(message.String()), c.raddr)
-		fmt.Println("udp WriteTo end")
-	} else {
-		fmt.Println("udp Write start : raddr =", c.raddr)
+	if c.write {
+		// fmt.Println("udp Write start : raddr =", c.raddr)
 		_, err = c.conn.Write([]byte(message.String()))
-		fmt.Println("udp Write end")
+		// fmt.Println("udp Write end")
+	} else {
+		// fmt.Println("udp WriteTo start : raddr=", c.raddr)
+		_, err = c.conn.WriteTo([]byte(message.String()), c.raddr)
+		// fmt.Println("udp WriteTo end")
 	}
 	return err
 }
@@ -56,9 +54,9 @@ func (c *UDP) Receive() (network.Message, error) {
 		err error
 	)
 	buffer := make([]byte, 1024)
-	fmt.Println("udp ReadFrom start")
+	// fmt.Println("udp ReadFrom start")
 	n, c.raddr, err = c.conn.ReadFrom(buffer)
-	fmt.Println("udp ReadFrom end : raddr = ", c.raddr.String())
+	// fmt.Println("udp ReadFrom end : raddr = ", c.raddr.String())
 	m = message(string(buffer[:n]))
 	return &m, err
 }
@@ -102,9 +100,9 @@ func NewQUIC(conn quic.Session, stream quic.Stream, laddr, raddr net.Addr) netwo
 }
 
 func (c QUIC) Send(message network.Message) error {
-	fmt.Println("quic Write start : local:", c.conn.LocalAddr(), "remote:", c.conn.RemoteAddr())
+	// fmt.Println("quic Write start : local:", c.conn.LocalAddr(), "remote:", c.conn.RemoteAddr())
 	c.stream.Write([]byte(message.String()))
-	fmt.Println("quic Write end")
+	// fmt.Println("quic Write end")
 	return nil
 }
 
@@ -115,9 +113,9 @@ func (c QUIC) Receive() (network.Message, error) {
 		err error
 	)
 	buffer := make([]byte, 1024)
-	fmt.Println("quic Read start : local:", c.conn.LocalAddr(), "remote:", c.conn.RemoteAddr())
+	// fmt.Println("quic Read start : local:", c.conn.LocalAddr(), "remote:", c.conn.RemoteAddr())
 	n, err = c.stream.Read(buffer)
-	fmt.Println("quic Read end")
+	// fmt.Println("quic Read end")
 	if err != nil {
 		return nil, err
 	}

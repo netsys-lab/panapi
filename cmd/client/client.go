@@ -14,6 +14,7 @@ func main() {
 	RemoteSpecifier.WithAddress("19-ffaa:1:e9e,[127.0.0.1]:1234")
 	// RemoteSpecifier.WithTransport(taps.TRANSPORT_UDP)
 	RemoteSpecifier.WithTransport(taps.TRANSPORT_QUIC)
+	// RemoteSpecifier.WithTransport(taps.TRANSPORT_TCP)
 
 	Preconnection, err := taps.NewPreconnection(RemoteSpecifier)
 	if err != nil {

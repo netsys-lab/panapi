@@ -2,12 +2,12 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"code.ovgu.de/hausheer/taps-api/taps"
 )
 
 func main() {
-	log.SetFlags(log.Lshortfile)
 	LocalSpecifier := taps.NewLocalEndpoint()
 	// LocalSpecifier.WithNetwork(taps.NETWORK_IP)
 	// LocalSpecifier.WithAddress(":1234")
@@ -15,25 +15,29 @@ func main() {
 	LocalSpecifier.WithAddress("19-ffaa:1:e9e,[127.0.0.1]:1234")
 	// LocalSpecifier.WithTransport(taps.TRANSPORT_UDP)
 	LocalSpecifier.WithTransport(taps.TRANSPORT_QUIC)
+	// LocalSpecifier.WithTransport(taps.TRANSPORT_TCP)
 
 	Preconnection, err := taps.NewPreconnection(LocalSpecifier)
 	if err != nil {
 		log.Fatalf("Error! %s\n", err)
 	}
-	for {
-		Listener := Preconnection.Listen()
 
-		Connection := <-Listener
+	Listener := Preconnection.Listen()
 
-		Message, err := Connection.Receive()
-		if err != nil {
-			log.Printf("Error! %s\n", err)
-		}
-		log.Printf("Message: %v\n", Message)
+	Connection := <-Listener
 
-		err = Connection.Send(taps.Message("Got your message!\n"))
-		if err != nil {
-			log.Printf("Error! %s\n", err)
-		}
+	Message, err := Connection.Receive()
+	if err != nil {
+		log.Printf("Error! %s\n", err)
 	}
+	log.Printf("Message: %v\n", Message)
+
+	err = Connection.Send(taps.Message("Got your message!\n"))
+	if err != nil {
+		log.Printf("Error! %s\n", err)
+	}
+
+	time.Sleep(1 * time.Second)
+	// for {
+	// }
 }
