@@ -28,9 +28,7 @@ func NewUDPDialer(address string) (*UDPDialer, error) {
 }
 
 func (d *UDPDialer) Dial() (network.Connection, error) {
-	// fmt.Println("scion udp Dial start")
 	conn, err := appnet.Dial(d.raddr)
-	// fmt.Println("scion udp Dial end")
 	if err != nil {
 		return nil, err
 	}
@@ -50,13 +48,15 @@ func NewUDPListener(address string) (*UDPListener, error) {
 }
 
 func (l *UDPListener) Listen() (network.Connection, error) {
-	// fmt.Println("scion udp ListenPort start")
 	conn, err := appnet.ListenPort(uint16(l.laddr.Host.Port))
-	// fmt.Println("scion udp ListenPort end")
 	if err != nil {
 		return nil, err
 	}
 	return connection.NewUDP(conn, conn.LocalAddr(), conn.RemoteAddr(), false), err
+}
+
+func (l *UDPListener) Stop() error {
+	return nil
 }
 
 type QUICDialer struct {
@@ -72,15 +72,11 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"taps-quic-test"},
 	}
-	// fmt.Println("scion quic Dial start")
 	conn, err := appquic.Dial(d.raddr, tlsConf, nil)
-	// fmt.Println("scion quic Dial end")
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Println("scion quic OpenStreamSync start")
 	stream, err := conn.OpenStreamSync(context.Background())
-	// fmt.Println("scion quic OpenStreamSync end")
 	if err != nil {
 		return nil, err
 	}
@@ -96,9 +92,7 @@ func NewQUICListener(address string) (*QUICListener, error) {
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Println("scion quic ListenPort start")
 	listener, err := appquic.ListenPort(uint16(addr.Host.Port), generateTLSConfig(), nil)
-	// fmt.Println("scion quic ListenPort end")
 	if err != nil {
 		return nil, err
 	}
@@ -106,29 +100,27 @@ func NewQUICListener(address string) (*QUICListener, error) {
 }
 
 func (l *QUICListener) Listen() (network.Connection, error) {
-	// fmt.Println("scion quic Accept start")
 	conn, err := l.listener.Accept(context.Background())
-	// fmt.Println("scion quic Accept end")
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Println("scion quic AcceptStream start")
 	stream, err := conn.AcceptStream(context.Background())
-	// fmt.Println("scion quic AcceptStream end")
 	if err != nil {
 		return nil, err
 	}
 	return connection.NewQUIC(conn, stream, conn.LocalAddr(), conn.RemoteAddr()), err
 }
 
+func (l *QUICListener) Stop() error {
+	return nil
+}
+
 type scion struct{}
 
 func (scion *scion) NewListener(e *network.Endpoint) (network.Listener, error) {
 	switch e.Transport {
-	// case taps.TRANSPORT_UDP:
 	case "UDP":
 		return NewUDPListener(e.LocalAddress)
-	// case taps.TRANSPORT_QUIC:
 	case "QUIC":
 		return NewQUICListener(e.LocalAddress)
 	default:
@@ -138,10 +130,8 @@ func (scion *scion) NewListener(e *network.Endpoint) (network.Listener, error) {
 
 func (scion *scion) NewDialer(e *network.Endpoint) (network.Dialer, error) {
 	switch e.Transport {
-	// case taps.TRANSPORT_UDP:
 	case "UDP":
 		return NewUDPDialer(e.RemoteAddress)
-	// case taps.TRANSPORT_QUIC:
 	case "QUIC":
 		return NewQUICDialer(e.RemoteAddress)
 	default:

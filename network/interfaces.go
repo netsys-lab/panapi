@@ -7,6 +7,7 @@ type Message interface {
 type Connection interface {
 	Send(Message) error
 	Receive() (Message, error)
+	Close() error
 }
 
 type Dialer interface {
@@ -15,10 +16,11 @@ type Dialer interface {
 
 type Listener interface {
 	Listen() (Connection, error)
+	Stop() error
 }
 
 type Preconnection interface {
-	Listen() chan Connection
+	Listen() (Listener, error)
 	Initiate() Connection
 }
 

@@ -13,6 +13,7 @@ import (
 	"net"
 
 	"code.ovgu.de/hausheer/taps-api/connection"
+	"code.ovgu.de/hausheer/taps-api/glob"
 	"code.ovgu.de/hausheer/taps-api/network"
 	"github.com/lucas-clemente/quic-go"
 )
@@ -55,6 +56,10 @@ func (l *UDPListener) Listen() (network.Connection, error) {
 		return nil, err
 	}
 	return connection.NewUDP(conn, conn.LocalAddr(), conn.RemoteAddr(), false), err
+}
+
+func (l *UDPListener) Stop() error {
+	return nil
 }
 
 type TCPDialer struct {
@@ -102,6 +107,10 @@ func (l *TCPListener) Listen() (network.Connection, error) {
 	return connection.NewTCP(conn, conn.LocalAddr(), conn.RemoteAddr()), err
 }
 
+func (l *TCPListener) Stop() error {
+	return l.listener.Close()
+}
+
 type QUICDialer struct {
 	raddr string
 }
@@ -115,15 +124,11 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"taps-quic-test"},
 	}
-	// fmt.Println("ip quic DialAddr start")
 	conn, err := quic.DialAddr(d.raddr, tlsConf, nil)
-	// fmt.Println("ip quic DialAddr end")
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Println("ip quic OpenStreamSync start")
 	stream, err := conn.OpenStreamSync(context.Background())
-	// fmt.Println("ip quic OpenStreamSync end")
 	if err != nil {
 		return nil, err
 	}
@@ -135,9 +140,7 @@ type QUICListener struct {
 }
 
 func NewQUICListener(address string) (*QUICListener, error) {
-	// fmt.Println("ip quic ListenAddr start")
 	listener, err := quic.ListenAddr(address, generateTLSConfig(), nil)
-	// fmt.Println("ip quic ListenAddr end")
 	if err != nil {
 		return nil, err
 	}
@@ -145,33 +148,30 @@ func NewQUICListener(address string) (*QUICListener, error) {
 }
 
 func (l *QUICListener) Listen() (network.Connection, error) {
-	// fmt.Println("ip quic Accept start")
 	conn, err := l.listener.Accept(context.Background())
-	// fmt.Println("ip quic Accept end")
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Println("ip quic AcceptStream start")
 	stream, err := conn.AcceptStream(context.Background())
-	// fmt.Println("ip quic AcceptStream end")
 	if err != nil {
 		return nil, err
 	}
 	return connection.NewQUIC(conn, stream, conn.LocalAddr(), conn.RemoteAddr()), err
 }
 
+func (l *QUICListener) Stop() error {
+	return nil
+}
+
 type ip struct{}
 
 func (ip *ip) NewListener(e *network.Endpoint) (network.Listener, error) {
 	switch e.Transport {
-	// case taps.TRANSPORT_UDP:
-	case "UDP":
+	case glob.TRANSPORT_UDP:
 		return NewUDPListener(e.LocalAddress)
-	// case taps.TRANSPORT_TCP:
-	case "TCP":
+	case glob.TRANSPORT_TCP:
 		return NewTCPListener(e.LocalAddress)
-	// case taps.TRANSPORT_QUIC:
-	case "QUIC":
+	case glob.TRANSPORT_QUIC:
 		return NewQUICListener(e.LocalAddress)
 	default:
 		return nil, errors.New(fmt.Sprintf("Transport %s not implemented for IP", e.Transport))
@@ -180,14 +180,11 @@ func (ip *ip) NewListener(e *network.Endpoint) (network.Listener, error) {
 
 func (ip *ip) NewDialer(e *network.Endpoint) (network.Dialer, error) {
 	switch e.Transport {
-	// case taps.TRANSPORT_UDP:
-	case "UDP":
+	case glob.TRANSPORT_UDP:
 		return NewUDPDialer(e.RemoteAddress)
-	// case taps.TRANSPORT_TCP:
-	case "TCP":
+	case glob.TRANSPORT_TCP:
 		return NewTCPDialer(e.RemoteAddress)
-	// case taps.TRANSPORT_QUIC:
-	case "QUIC":
+	case glob.TRANSPORT_QUIC:
 		return NewQUICDialer(e.RemoteAddress)
 	default:
 		return nil, errors.New(fmt.Sprintf("Transport %s not implemented for IP", e.Transport))

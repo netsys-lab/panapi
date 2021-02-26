@@ -2,24 +2,21 @@ package connection
 
 import (
 	"net"
+	"time"
 
+	"code.ovgu.de/hausheer/taps-api/glob"
 	"code.ovgu.de/hausheer/taps-api/network"
 	"github.com/lucas-clemente/quic-go"
 )
 
-//conn includes the lowest common denominator of member functions of
-//net.UDPConn and snet.Conn. This way, both the ip and the scion package
-//can make use of the UDP helper
+// conn includes the lowest common denominator of member functions of
+// net.UDPConn and snet.Conn. This way, both the ip and the scion package
+// can make use of the UDP helper
 type conn interface {
 	Write([]byte) (int, error)
 	WriteTo([]byte, net.Addr) (int, error)
 	ReadFrom([]byte) (int, net.Addr, error)
-}
-
-type message string
-
-func (m message) String() string {
-	return string(m)
+	Close() error
 }
 
 type UDP struct {
@@ -36,29 +33,27 @@ func NewUDP(conn conn, laddr, raddr net.Addr, write bool) network.Connection {
 func (c *UDP) Send(message network.Message) error {
 	var err error
 	if c.write {
-		// fmt.Println("udp Write start : raddr =", c.raddr)
 		_, err = c.conn.Write([]byte(message.String()))
-		// fmt.Println("udp Write end")
 	} else {
-		// fmt.Println("udp WriteTo start : raddr=", c.raddr)
 		_, err = c.conn.WriteTo([]byte(message.String()), c.raddr)
-		// fmt.Println("udp WriteTo end")
 	}
 	return err
 }
 
 func (c *UDP) Receive() (network.Message, error) {
 	var (
-		m   message
+		m   glob.Message
 		n   int
 		err error
 	)
 	buffer := make([]byte, 1024)
-	// fmt.Println("udp ReadFrom start")
 	n, c.raddr, err = c.conn.ReadFrom(buffer)
-	// fmt.Println("udp ReadFrom end : raddr = ", c.raddr.String())
-	m = message(string(buffer[:n]))
+	m = glob.Message(string(buffer[:n]))
 	return &m, err
+}
+
+func (c *UDP) Close() error {
+	return c.conn.Close()
 }
 
 type TCP struct {
@@ -78,14 +73,18 @@ func (c TCP) Send(message network.Message) error {
 
 func (c TCP) Receive() (network.Message, error) {
 	var (
-		m   message
+		m   glob.Message
 		n   int
 		err error
 	)
 	buffer := make([]byte, 1024)
 	n, err = c.conn.Read(buffer)
-	m = message(string(buffer[:n]))
+	m = glob.Message(string(buffer[:n]))
 	return &m, err
+}
+
+func (c *TCP) Close() error {
+	return c.conn.Close()
 }
 
 type QUIC struct {
@@ -100,25 +99,27 @@ func NewQUIC(conn quic.Session, stream quic.Stream, laddr, raddr net.Addr) netwo
 }
 
 func (c QUIC) Send(message network.Message) error {
-	// fmt.Println("quic Write start : local:", c.conn.LocalAddr(), "remote:", c.conn.RemoteAddr())
-	c.stream.Write([]byte(message.String()))
-	// fmt.Println("quic Write end")
-	return nil
+	_, err := c.stream.Write([]byte(message.String()))
+	return err
 }
 
 func (c QUIC) Receive() (network.Message, error) {
 	var (
-		m   message
+		m   glob.Message
 		n   int
 		err error
 	)
 	buffer := make([]byte, 1024)
-	// fmt.Println("quic Read start : local:", c.conn.LocalAddr(), "remote:", c.conn.RemoteAddr())
 	n, err = c.stream.Read(buffer)
-	// fmt.Println("quic Read end")
 	if err != nil {
 		return nil, err
 	}
-	m = message(string(buffer[:n]))
+	m = glob.Message(string(buffer[:n]))
 	return &m, err
+}
+
+func (c *QUIC) Close() error {
+	// todo
+	time.Sleep(1000 * time.Microsecond)
+	return c.conn.CloseWithError(0, "closed by server.")
 }

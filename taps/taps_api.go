@@ -1,34 +1,43 @@
 package taps
 
 import (
-	"errors"
+	"flag"
+	"fmt"
+	"os/exec"
+	"strings"
 
+	"code.ovgu.de/hausheer/taps-api/errs"
 	"code.ovgu.de/hausheer/taps-api/ip"
 	"code.ovgu.de/hausheer/taps-api/network"
 	"code.ovgu.de/hausheer/taps-api/scion"
 )
 
-const (
-	NETWORK_IP    = "IP"
-	NETWORK_IPV4  = "IPv4"
-	NETWORK_IPV6  = "IPv6"
-	NETWORK_SCION = "SCION"
+type Preconnection struct {
+	endpoint *network.Endpoint
+	listener network.Listener
+	dialer   network.Dialer
+}
 
-	TRANSPORT_UDP  = "UDP"
-	TRANSPORT_TCP  = "TCP"
-	TRANSPORT_QUIC = "QUIC"
-)
+type Listener struct {
+	listener           network.Listener
+	ConnectionReceived chan network.Connection
+}
 
-var (
-	errNetworkType    = errors.New("invalid network type")
-	errTransportType  = errors.New("invalid address type")
-	errNotImplemented = errors.New("not (yet) supported")
-)
+func Init(network, address, transport *string) {
+	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
+	defer exec.Command("stty", "-F", "/dev/tty", "echo").Run()
 
-type Message string
+	address_p := flag.String("a", "[127.0.0.1]:1337", "ip or scion address and port")
+	network_p := flag.String("n", NETWORK_IP, "network type: ip or scion")
+	transport_p := flag.String("t", TRANSPORT_TCP, "transport protocol: udp, tcp, quic")
 
-func (m Message) String() string {
-	return string(m)
+	flag.Parse()
+
+	*address = *address_p
+	*network = strings.ToUpper(*network_p)
+	*transport = strings.ToUpper(*transport_p)
+
+	fmt.Println(*network, " | ", *transport, " | ", *address)
 }
 
 func NewRemoteEndpoint() *network.Endpoint {
@@ -39,26 +48,18 @@ func NewLocalEndpoint() *network.Endpoint {
 	return &network.Endpoint{Local: true}
 }
 
-type Preconnection struct {
-	endpoint *network.Endpoint
-	listener network.Listener
-	dialer   network.Dialer
-}
-
-// TODO, detect closed connections, do failure recovery
-func (p Preconnection) Listen() chan network.Connection {
+func (p Preconnection) Listen() Listener {
 	c := make(chan network.Connection)
-	go func(c chan network.Connection, listener network.Listener) {
+	go func(p Preconnection) {
 		// for {
-		conn, err := listener.Listen()
+		conn, err := p.listener.Listen()
 		if err != nil {
-			// FIXME TODO
 			panic(err)
 		}
 		c <- conn
 		// }
-	}(c, p.listener)
-	return c
+	}(p)
+	return Listener{ConnectionReceived: c, listener: p.listener}
 }
 
 func (p Preconnection) Initiate() network.Connection {
@@ -67,6 +68,10 @@ func (p Preconnection) Initiate() network.Connection {
 		panic(err)
 	}
 	return conn
+}
+
+func (l Listener) Stop() error {
+	return l.listener.Stop()
 }
 
 func NewPreconnection(e *network.Endpoint) (Preconnection, error) {
@@ -82,7 +87,7 @@ func NewPreconnection(e *network.Endpoint) (Preconnection, error) {
 	case TRANSPORT_TCP:
 	case TRANSPORT_QUIC:
 	default:
-		return p, errTransportType
+		return p, errs.TransportType
 	}
 
 	switch e.Network {
@@ -91,7 +96,7 @@ func NewPreconnection(e *network.Endpoint) (Preconnection, error) {
 	case NETWORK_SCION:
 		network = scion.Network()
 	default:
-		return p, errNetworkType
+		return p, errs.NetworkType
 	}
 
 	if e.Local {
