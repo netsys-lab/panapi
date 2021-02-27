@@ -2,8 +2,6 @@ package taps
 
 import (
 	"flag"
-	"fmt"
-	"os/exec"
 	"strings"
 
 	"code.ovgu.de/hausheer/taps-api/errs"
@@ -24,9 +22,6 @@ type Listener struct {
 }
 
 func Init(network, address, transport *string) {
-	exec.Command("stty", "-F", "/dev/tty", "cbreak", "min", "1").Run()
-	defer exec.Command("stty", "-F", "/dev/tty", "echo").Run()
-
 	address_p := flag.String("a", "[127.0.0.1]:1337", "ip or scion address and port")
 	network_p := flag.String("n", NETWORK_IP, "network type: ip or scion")
 	transport_p := flag.String("t", TRANSPORT_TCP, "transport protocol: udp, tcp, quic")
@@ -37,7 +32,7 @@ func Init(network, address, transport *string) {
 	*network = strings.ToUpper(*network_p)
 	*transport = strings.ToUpper(*transport_p)
 
-	fmt.Println(*network, " | ", *transport, " | ", *address)
+	// fmt.Println(*network, " | ", *transport, " | ", *address)
 }
 
 func NewRemoteEndpoint() *network.Endpoint {
@@ -50,24 +45,18 @@ func NewLocalEndpoint() *network.Endpoint {
 
 func (p Preconnection) Listen() Listener {
 	c := make(chan network.Connection)
-	go func(p Preconnection) {
-		// for {
+	go func(p Preconnection, c chan network.Connection) {
 		conn, err := p.listener.Listen()
 		if err != nil {
-			panic(err)
+			conn.SetError(err)
 		}
 		c <- conn
-		// }
-	}(p)
+	}(p, c)
 	return Listener{ConnectionReceived: c, listener: p.listener}
 }
 
-func (p Preconnection) Initiate() network.Connection {
-	conn, err := p.dialer.Dial()
-	if err != nil {
-		panic(err)
-	}
-	return conn
+func (p Preconnection) Initiate() (network.Connection, error) {
+	return p.dialer.Dial()
 }
 
 func (l Listener) Stop() error {
@@ -104,7 +93,6 @@ func NewPreconnection(e *network.Endpoint) (Preconnection, error) {
 	} else {
 		dialer, err = network.NewDialer(e)
 	}
-
 	if err != nil {
 		return p, err
 	}

@@ -7,6 +7,18 @@ import (
 	"code.ovgu.de/hausheer/taps-api/taps"
 )
 
+func fcheck(err error) {
+	if err != nil {
+		log.Fatalf("Error! %s\n", err)
+	}
+}
+
+func check(err error) {
+	if err != nil {
+		log.Printf("Error! %s\n", err)
+	}
+}
+
 func main() {
 	var network, address, transport string
 	taps.Init(&network, &address, &transport)
@@ -21,28 +33,26 @@ func main() {
 	// LocalSpecifier.WithNetwork(taps.NETWORK_SCION)
 	// LocalSpecifier.WithAddress("19-ffaa:1:e9e,[127.0.0.1]:1337")
 	// LocalSpecifier.WithTransport(taps.TRANSPORT_UDP)
-	// LocalSpecifier.WithTransport(taps.TRANSPORT_QUIC)
 	// LocalSpecifier.WithTransport(taps.TRANSPORT_TCP)
+	// LocalSpecifier.WithTransport(taps.TRANSPORT_QUIC)
 
 	Preconnection, err := taps.NewPreconnection(LocalSpecifier)
-	if err != nil {
-		log.Fatalf("Error! %s\n", err)
-	}
+	fcheck(err)
 
 	Listener := Preconnection.Listen()
 	Connection := <-Listener.ConnectionReceived
-	Listener.Stop()
+	fcheck(Connection.GetError())
+
+	err = Listener.Stop()
+	check(err)
 
 	Message, err := Connection.Receive()
-	if err != nil {
-		fmt.Printf("Error! %s\n", err)
-	}
+	check(err)
 	fmt.Printf("Message: %v\n", Message.String())
 
 	err = Connection.Send(taps.Message("Got your message!\n"))
-	if err != nil {
-		fmt.Printf("Error! %s\n", err)
-	}
+	check(err)
 
-	Connection.Close()
+	err = Connection.Close()
+	check(err)
 }

@@ -24,10 +24,11 @@ type UDP struct {
 	laddr net.Addr
 	raddr net.Addr
 	write bool
+	err   error
 }
 
 func NewUDP(conn conn, laddr, raddr net.Addr, write bool) network.Connection {
-	return &UDP{conn, laddr, raddr, write}
+	return &UDP{conn, laddr, raddr, write, nil}
 }
 
 func (c *UDP) Send(message network.Message) error {
@@ -56,14 +57,23 @@ func (c *UDP) Close() error {
 	return c.conn.Close()
 }
 
+func (c *UDP) SetError(err error) {
+	c.err = err
+}
+
+func (c *UDP) GetError() error {
+	return c.err
+}
+
 type TCP struct {
 	conn  *net.TCPConn
 	laddr net.Addr
 	raddr net.Addr
+	err   error
 }
 
 func NewTCP(conn *net.TCPConn, laddr, raddr net.Addr) network.Connection {
-	return &TCP{conn, laddr, raddr}
+	return &TCP{conn, laddr, raddr, nil}
 }
 
 func (c TCP) Send(message network.Message) error {
@@ -87,15 +97,24 @@ func (c *TCP) Close() error {
 	return c.conn.Close()
 }
 
+func (c *TCP) SetError(err error) {
+	c.err = err
+}
+
+func (c *TCP) GetError() error {
+	return c.err
+}
+
 type QUIC struct {
 	conn   quic.Session
 	stream quic.Stream
 	laddr  net.Addr
 	raddr  net.Addr
+	err    error
 }
 
 func NewQUIC(conn quic.Session, stream quic.Stream, laddr, raddr net.Addr) network.Connection {
-	return &QUIC{conn, stream, laddr, raddr}
+	return &QUIC{conn, stream, laddr, raddr, nil}
 }
 
 func (c QUIC) Send(message network.Message) error {
@@ -122,4 +141,12 @@ func (c *QUIC) Close() error {
 	// todo
 	time.Sleep(1000 * time.Microsecond)
 	return c.conn.CloseWithError(0, "closed by server.")
+}
+
+func (c *QUIC) SetError(err error) {
+	c.err = err
+}
+
+func (c *QUIC) GetError() error {
+	return c.err
 }

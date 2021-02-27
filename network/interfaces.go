@@ -8,6 +8,8 @@ type Connection interface {
 	Send(Message) error
 	Receive() (Message, error)
 	Close() error
+	SetError(error)
+	GetError() error
 }
 
 type Dialer interface {
@@ -21,7 +23,7 @@ type Listener interface {
 
 type Preconnection interface {
 	Listen() (Listener, error)
-	Initiate() Connection
+	Initiate() (Connection, error)
 }
 
 type Network interface {
