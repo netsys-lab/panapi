@@ -21,7 +21,7 @@ type Listener struct {
 	ConnectionReceived chan network.Connection
 }
 
-func Init(network, address, transport *string) {
+func GetFlags(network, address, transport *string) {
 	address_p := flag.String("a", "[127.0.0.1]:1337", "ip or scion address and port")
 	network_p := flag.String("n", NETWORK_IP, "network type: ip or scion")
 	transport_p := flag.String("t", TRANSPORT_TCP, "transport protocol: udp, tcp, quic")
@@ -43,9 +43,9 @@ func NewLocalEndpoint() *network.Endpoint {
 	return &network.Endpoint{Local: true}
 }
 
-func (p Preconnection) Listen() Listener {
+func (p *Preconnection) Listen() Listener {
 	c := make(chan network.Connection)
-	go func(p Preconnection, c chan network.Connection) {
+	go func(p *Preconnection, c chan network.Connection) {
 		conn, err := p.listener.Listen()
 		if err != nil {
 			conn.SetError(err)
@@ -55,11 +55,11 @@ func (p Preconnection) Listen() Listener {
 	return Listener{ConnectionReceived: c, listener: p.listener}
 }
 
-func (p Preconnection) Initiate() (network.Connection, error) {
+func (p *Preconnection) Initiate() (network.Connection, error) {
 	return p.dialer.Dial()
 }
 
-func (l Listener) Stop() error {
+func (l *Listener) Stop() error {
 	return l.listener.Stop()
 }
 

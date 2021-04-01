@@ -21,7 +21,7 @@ func check(err error) {
 
 func main() {
 	var network, address, transport string
-	taps.Init(&network, &address, &transport)
+	taps.GetFlags(&network, &address, &transport)
 
 	RemoteSpecifier := taps.NewRemoteEndpoint()
 
@@ -43,7 +43,7 @@ func main() {
 	Connection, err := Preconnection.Initiate()
 	fcheck(err)
 
-	err = Connection.Send(taps.Message("Hai!\n"))
+	err = Connection.Send(taps.Message("Hi from client!\n"))
 	check(err)
 
 	Message, err := Connection.Receive()

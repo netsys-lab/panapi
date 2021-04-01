@@ -9,9 +9,14 @@ import (
 	"github.com/lucas-clemente/quic-go"
 )
 
-// conn includes the lowest common denominator of member functions of
-// net.UDPConn and snet.Conn. This way, both the ip and the scion package
-// can make use of the UDP helper
+var timeout = 1 * time.Second
+var timeStep = 10 * time.Millisecond
+
+/**
+ * conn includes the lowest common denominator of member
+ * functions of net.UDPConn and snet.Conn. This way, both the
+ * ip and the scion package can make use of the UDP helper.
+ */
 type conn interface {
 	Write([]byte) (int, error)
 	WriteTo([]byte, net.Addr) (int, error)
@@ -76,12 +81,12 @@ func NewTCP(conn *net.TCPConn, laddr, raddr net.Addr) network.Connection {
 	return &TCP{conn, laddr, raddr, nil}
 }
 
-func (c TCP) Send(message network.Message) error {
+func (c *TCP) Send(message network.Message) error {
 	_, err := c.conn.Write([]byte(message.String()))
 	return err
 }
 
-func (c TCP) Receive() (network.Message, error) {
+func (c *TCP) Receive() (network.Message, error) {
 	var (
 		m   glob.Message
 		n   int
@@ -110,19 +115,21 @@ type QUIC struct {
 	stream quic.Stream
 	laddr  net.Addr
 	raddr  net.Addr
+	last   time.Time
 	err    error
 }
 
 func NewQUIC(conn quic.Session, stream quic.Stream, laddr, raddr net.Addr) network.Connection {
-	return &QUIC{conn, stream, laddr, raddr, nil}
+	return &QUIC{conn, stream, laddr, raddr, time.Now().Add(-1 * timeout), nil}
 }
 
-func (c QUIC) Send(message network.Message) error {
+func (c *QUIC) Send(message network.Message) error {
 	_, err := c.stream.Write([]byte(message.String()))
+	c.last = time.Now()
 	return err
 }
 
-func (c QUIC) Receive() (network.Message, error) {
+func (c *QUIC) Receive() (network.Message, error) {
 	var (
 		m   glob.Message
 		n   int
@@ -130,17 +137,15 @@ func (c QUIC) Receive() (network.Message, error) {
 	)
 	buffer := make([]byte, 1024)
 	n, err = c.stream.Read(buffer)
-	if err != nil {
-		return nil, err
-	}
 	m = glob.Message(string(buffer[:n]))
 	return &m, err
 }
 
 func (c *QUIC) Close() error {
-	// todo
-	time.Sleep(1000 * time.Microsecond)
-	return c.conn.CloseWithError(0, "closed by server.")
+	for time.Now().Sub(c.last) < timeout {
+		time.Sleep(timeStep)
+	}
+	return c.conn.CloseWithError(0, "connection closed.")
 }
 
 func (c *QUIC) SetError(err error) {

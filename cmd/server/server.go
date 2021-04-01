@@ -21,7 +21,7 @@ func check(err error) {
 
 func main() {
 	var network, address, transport string
-	taps.Init(&network, &address, &transport)
+	taps.GetFlags(&network, &address, &transport)
 
 	LocalSpecifier := taps.NewLocalEndpoint()
 	LocalSpecifier.WithNetwork(network)
@@ -50,7 +50,7 @@ func main() {
 	check(err)
 	fmt.Printf("Message: %v\n", Message.String())
 
-	err = Connection.Send(taps.Message("Got your message!\n"))
+	err = Connection.Send(taps.Message("Hi from server!\n"))
 	check(err)
 
 	err = Connection.Close()
