@@ -1,93 +1,58 @@
 package main
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
 	"fmt"
-	"os"
-	"strings"
+	"log"
 
 	"code.ovgu.de/hausheer/taps-api/taps"
 )
 
+func fcheck(err error) {
+	if err != nil {
+		log.Fatalf("Error! %s\n", err)
+	}
+}
+
 func check(err error) {
 	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
+		log.Printf("Error! %s\n", err)
 	}
 }
 
 func main() {
-	var err error
+	var network, address, transport string
+	taps.GetFlags(&network, &address, &transport)
 
-	servF, addrF, portF, interF := taps.Init()
+	LocalSpecifier := taps.NewLocalEndpoint()
+	LocalSpecifier.WithNetwork(network)
+	LocalSpecifier.WithAddress(address)
+	LocalSpecifier.WithTransport(transport)
 
-	ser := taps.NewLocalEndpoint()
-	err = ser.WithInterface(*interF)
-	check(err)
-	err = ser.WithService(*servF)
-	check(err)
-	err = ser.WithAddress(*addrF)
-	check(err)
-	err = ser.WithPort(*portF)
-	check(err)
+	// LocalSpecifier.WithNetwork(taps.NETWORK_IP)
+	// LocalSpecifier.WithAddress(":1337")
+	// LocalSpecifier.WithNetwork(taps.NETWORK_SCION)
+	// LocalSpecifier.WithAddress("19-ffaa:1:e9e,[127.0.0.1]:1337")
+	// LocalSpecifier.WithTransport(taps.TRANSPORT_UDP)
+	// LocalSpecifier.WithTransport(taps.TRANSPORT_TCP)
+	// LocalSpecifier.WithTransport(taps.TRANSPORT_QUIC)
 
-	transProp := taps.NewTransportProperties()
-	// transProp.Require(taps.NAGLE_ON)
+	Preconnection, err := taps.NewPreconnection(LocalSpecifier)
+	fcheck(err)
 
-	privatKey, err := rsa.GenerateKey(rand.Reader, 1024)
-	check(err)
-	secParam := taps.NewSecurityParameters()
-	// err = secParam.Set("keypair", 1, &privatKey.PublicKey)
-	err = secParam.Set("keypair", privatKey, &privatKey.PublicKey)
-	check(err)
+	Listener := Preconnection.Listen()
+	Connection := <-Listener.ConnectionReceived
+	fcheck(Connection.GetError())
 
-	preconn, err := taps.NewPreconnection(ser, transProp, secParam)
-	check(err)
-	lis, err := preconn.Listen()
+	err = Listener.Stop()
 	check(err)
 
-	quitter := make(chan bool)
-	sender := make(chan string)
+	Message, err := Connection.Receive()
+	check(err)
+	fmt.Printf("Message: %v\n", Message.String())
 
-	go func() {
-		var b []byte = make([]byte, 1)
-		for {
-			os.Stdin.Read(b)
-			str := string(b)
-			// str, _ := bufio.NewReader(os.Stdin).ReadString('\n')
-			if strings.Contains(str, ".") {
-				quitter <- true
-			} else {
-				sender <- str
-			}
-		}
-	}()
+	err = Connection.Send(taps.Message("Hi from server!\n"))
+	check(err)
 
-	var conn taps.Connection
-
-loop:
-	for {
-		select {
-		case conn = <-lis.ConnRec:
-			check(conn.Err)
-			go func() {
-				for {
-					msg, err := conn.Receive()
-					check(err)
-					fmt.Print(msg.Data)
-				}
-			}()
-		case msg := <-sender:
-			err = conn.Send(taps.NewMessage(msg, ""))
-			check(err)
-		case <-quitter:
-			fmt.Println()
-			lis.Stop()
-			break loop
-		}
-	}
-
-	conn.Close()
+	err = Connection.Close()
 	check(err)
 }
