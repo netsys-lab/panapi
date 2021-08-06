@@ -1,9 +1,9 @@
-module code.ovgu.de/hausheer/taps-api
+module github.com/netsys-lab/panapi
 
-go 1.15
+go 1.16
 
 require (
-	github.com/lucas-clemente/quic-go v0.19.2
+	github.com/lucas-clemente/quic-go v0.21.1
 	github.com/netsec-ethz/scion-apps v0.3.0
 	github.com/scionproto/scion v0.6.0
 )
