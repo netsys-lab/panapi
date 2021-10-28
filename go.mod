@@ -9,6 +9,7 @@ require (
 )
 
 require (
+	github.com/antlr/antlr4 v0.0.0-20181218183524-be58ebffde8e // indirect
 	github.com/bclicn/color v0.0.0-20180711051946-108f2023dc84 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/britram/borat v0.0.0-20181011130314-f891bcfcfb9b // indirect
@@ -59,4 +60,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-replace github.com/scionproto/scion => github.com/netsec-ethz/scion v0.0.0-20211005155700-e5719e3cd5ed
+replace (
+	github.com/netsec-ethz/scion-apps => github.com/netsys-lab/scion-apps v0.1.1-0.20211028160146-ad46bc4eb824
+	github.com/scionproto/scion => github.com/netsec-ethz/scion v0.0.0-20211005155700-e5719e3cd5ed
+)

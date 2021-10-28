@@ -2,56 +2,58 @@ package scion
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
+	//"crypto/rand"
+	//"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
-	"encoding/pem"
+	//"crypto/x509"
+	//"encoding/pem"
 	"errors"
 	"fmt"
-	"math/big"
+	"log"
+	//"math/big"
+	"net"
 
 	"github.com/lucas-clemente/quic-go"
-	"github.com/netsec-ethz/scion-apps/pkg/appnet"
-	"github.com/netsec-ethz/scion-apps/pkg/appnet/appquic"
+	"github.com/netsec-ethz/scion-apps/pkg/pan"
+	"github.com/netsec-ethz/scion-apps/pkg/quicutil"
 	"github.com/netsys-lab/panapi/pkg/network"
-	"github.com/scionproto/scion/go/lib/snet"
 )
 
 type UDPDialer struct {
-	raddr string
+	raddr pan.UDPAddr
 }
 
 func NewUDPDialer(address string) (*UDPDialer, error) {
-	return &UDPDialer{address}, nil
+	addr, err := pan.ResolveUDPAddr(address)
+	return &UDPDialer{addr}, err
 }
 
 func (d *UDPDialer) Dial() (network.Connection, error) {
-	conn, err := appnet.Dial(d.raddr)
+	conn, err := pan.DialUDP(context.Background(), nil, d.raddr, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	return network.NewUDP(conn, conn.LocalAddr(), conn.RemoteAddr(), false), err
+	return network.NewUDP(conn, nil, conn.LocalAddr(), conn.RemoteAddr()), err
 }
 
 type UDPListener struct {
-	laddr *snet.UDPAddr
+	laddr net.UDPAddr
 }
 
 func NewUDPListener(address string) (*UDPListener, error) {
-	addr, err := appnet.ResolveUDPAddr(address)
+	addr, err := pan.ResolveUDPAddr(address)
 	if err != nil {
 		return nil, err
 	}
-	return &UDPListener{addr}, nil
+	return &UDPListener{net.UDPAddr{Port: addr.Port}}, nil
 }
 
 func (l *UDPListener) Listen() (network.Connection, error) {
-	conn, err := appnet.ListenPort(uint16(l.laddr.Host.Port))
+	pconn, err := pan.ListenUDP(context.Background(), &l.laddr, nil)
 	if err != nil {
 		return &network.UDP{}, err
 	}
-	return network.NewUDP(conn, conn.LocalAddr(), conn.RemoteAddr(), false), nil
+	return network.NewUDP(nil, pconn, pconn.LocalAddr(), nil), nil
 }
 
 func (l *UDPListener) Stop() error {
@@ -59,23 +61,25 @@ func (l *UDPListener) Stop() error {
 }
 
 type QUICDialer struct {
-	raddr string
+	raddr pan.UDPAddr
 }
 
 func NewQUICDialer(address string) (*QUICDialer, error) {
-	return &QUICDialer{address}, nil
+	addr, err := pan.ResolveUDPAddr(address)
+	return &QUICDialer{addr}, err
 }
 
 func (d *QUICDialer) Dial() (network.Connection, error) {
 	tlsConf := &tls.Config{
+		//Certificates: quicutil.MustGenerateSelfSignedCert(),
 		InsecureSkipVerify: true,
-		NextProtos:         []string{"taps-quic-test"},
+		NextProtos:         []string{"panapi-quic-test"},
 	}
-	conn, err := appquic.Dial(d.raddr, tlsConf, nil)
+	conn, err := pan.DialQUIC(context.Background(), nil, d.raddr, nil, nil, "", tlsConf, nil)
 	if err != nil {
 		return nil, err
 	}
-	stream, err := conn.OpenStreamSync(context.Background())
+	stream, err := conn.OpenStream() //Sync(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -87,15 +91,20 @@ type QUICListener struct {
 }
 
 func NewQUICListener(address string) (*QUICListener, error) {
-	addr, err := appnet.ResolveUDPAddr(address)
+	addr, err := pan.ResolveUDPAddr(address)
 	if err != nil {
 		return nil, err
 	}
-	tlsConf, err := generateTLSConfig()
+	tlsConf := &tls.Config{
+		Certificates: quicutil.MustGenerateSelfSignedCert(),
+		//InsecureSkipVerify: true,
+		NextProtos: []string{"panapi-quic-test"},
+	}
+	//tlsConf, err := generateTLSConfig()
 	if err != nil {
 		return nil, err
 	}
-	listener, err := appquic.ListenPort(uint16(addr.Host.Port), tlsConf, nil)
+	listener, err := pan.ListenQUIC(context.Background(), &net.UDPAddr{Port: addr.Port}, nil, tlsConf, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +120,7 @@ func (l *QUICListener) Listen() (network.Connection, error) {
 	if err != nil {
 		return &network.QUIC{}, err
 	}
+	log.Println("accepted stream")
 	return network.NewQUIC(conn, stream, conn.LocalAddr(), conn.RemoteAddr()), nil
 }
 
@@ -146,7 +156,7 @@ func Network() network.Network {
 	return &scion{}
 }
 
-func generateTLSConfig() (*tls.Config, error) {
+/*func generateTLSConfig() (*tls.Config, error) {
 	key, err := rsa.GenerateKey(rand.Reader, 1024)
 	template := x509.Certificate{SerialNumber: big.NewInt(1)}
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
@@ -163,4 +173,4 @@ func generateTLSConfig() (*tls.Config, error) {
 		Certificates: []tls.Certificate{tlsCert},
 		NextProtos:   []string{"taps-quic-test"},
 	}, nil
-}
+        }*/

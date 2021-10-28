@@ -14,13 +14,13 @@ var timeStep = 10 * time.Millisecond
  * conn includes the lowest common denominator of member
  * functions of net.UDPConn and snet.Conn. This way, both the
  * ip and the scion package can make use of the UDP helper.
- */
+
 type conn interface {
 	Write([]byte) (int, error)
 	WriteTo([]byte, net.Addr) (int, error)
 	ReadFrom([]byte) (int, net.Addr, error)
 	Close() error
-}
+        }*/
 
 // TODO, placeholder stub implementation for message
 type DummyMessage string
@@ -30,23 +30,24 @@ func (m DummyMessage) String() string {
 }
 
 type UDP struct {
-	conn  conn
+	conn  net.Conn
+	pconn net.PacketConn
 	laddr net.Addr
 	raddr net.Addr
-	write bool
-	err   error
+	//write bool
+	err error
 }
 
-func NewUDP(conn conn, laddr, raddr net.Addr, write bool) Connection {
-	return &UDP{conn, laddr, raddr, write, nil}
+func NewUDP(conn net.Conn, pconn net.PacketConn, laddr, raddr net.Addr) Connection {
+	return &UDP{conn, pconn, laddr, raddr, nil}
 }
 
 func (c *UDP) Send(message Message) error {
 	var err error
-	if c.write {
+	if c.conn != nil {
 		_, err = c.conn.Write([]byte(message.String()))
-	} else {
-		_, err = c.conn.WriteTo([]byte(message.String()), c.raddr)
+	} else if c.pconn != nil {
+		_, err = c.pconn.WriteTo([]byte(message.String()), c.raddr)
 	}
 	return err
 }
@@ -57,14 +58,24 @@ func (c *UDP) Receive() (Message, error) {
 		n   int
 		err error
 	)
-	buffer := make([]byte, 1024)
-	n, c.raddr, err = c.conn.ReadFrom(buffer)
+	buffer := make([]byte, 16*1024)
+	if c.pconn != nil {
+		n, c.raddr, err = c.pconn.ReadFrom(buffer)
+	} else if c.conn != nil {
+		n, err = c.conn.Read(buffer)
+	}
 	m = DummyMessage(string(buffer[:n]))
 	return &m, err
 }
 
 func (c *UDP) Close() error {
-	return c.conn.Close()
+	if c.conn != nil {
+		return c.conn.Close()
+	}
+	if c.pconn != nil {
+		return c.pconn.Close()
+	}
+	return nil
 }
 
 func (c *UDP) SetError(err error) {

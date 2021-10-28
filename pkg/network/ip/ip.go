@@ -33,7 +33,7 @@ func (d *UDPDialer) Dial() (network.Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	return network.NewUDP(conn, conn.LocalAddr(), conn.RemoteAddr(), true), nil
+	return network.NewUDP(conn, nil, conn.LocalAddr(), conn.RemoteAddr()), nil
 }
 
 type UDPListener struct {
@@ -49,11 +49,11 @@ func NewUDPListener(address string) (*UDPListener, error) {
 }
 
 func (l *UDPListener) Listen() (network.Connection, error) {
-	conn, err := net.ListenUDP("udp", l.laddr)
+	pconn, err := net.ListenUDP("udp", l.laddr)
 	if err != nil {
 		return &network.UDP{}, err
 	}
-	return network.NewUDP(conn, conn.LocalAddr(), conn.RemoteAddr(), false), nil
+	return network.NewUDP(nil, pconn, pconn.LocalAddr(), pconn.RemoteAddr()), nil
 }
 
 func (l *UDPListener) Stop() error {
