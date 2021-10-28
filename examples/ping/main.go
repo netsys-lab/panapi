@@ -23,7 +23,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/netsys-lab/scion-measurement-lib/measured-appnet"
+	"github.com/netsys-lab/panapi/internal/measured-appnet"
 )
 
 func main() {

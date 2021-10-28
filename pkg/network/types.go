@@ -1,4 +1,4 @@
-package taps
+package network
 
 const (
 	NETWORK_IP    = "IP"
@@ -10,9 +10,3 @@ const (
 	TRANSPORT_TCP  = "TCP"
 	TRANSPORT_QUIC = "QUIC"
 )
-
-type Message string
-
-func (m Message) String() string {
-	return string(m)
-}

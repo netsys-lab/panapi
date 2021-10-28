@@ -1,13 +1,9 @@
-package taps
+package panapi
 
 import (
-	"flag"
-	"strings"
-
-	"code.ovgu.de/hausheer/taps-api/errs"
-	"code.ovgu.de/hausheer/taps-api/ip"
-	"code.ovgu.de/hausheer/taps-api/network"
-	"code.ovgu.de/hausheer/taps-api/scion"
+	"github.com/netsys-lab/panapi/pkg/network"
+	"github.com/netsys-lab/panapi/pkg/network/ip"
+	"github.com/netsys-lab/panapi/pkg/network/scion"
 )
 
 type Preconnection struct {
@@ -19,20 +15,6 @@ type Preconnection struct {
 type Listener struct {
 	listener           network.Listener
 	ConnectionReceived chan network.Connection
-}
-
-func GetFlags(network, address, transport *string) {
-	address_p := flag.String("a", "[127.0.0.1]:1337", "ip or scion address and port")
-	network_p := flag.String("n", NETWORK_IP, "network type: ip or scion")
-	transport_p := flag.String("t", TRANSPORT_TCP, "transport protocol: udp, tcp, quic")
-
-	flag.Parse()
-
-	*address = *address_p
-	*network = strings.ToUpper(*network_p)
-	*transport = strings.ToUpper(*transport_p)
-
-	// fmt.Println(*network, " | ", *transport, " | ", *address)
 }
 
 func NewRemoteEndpoint() *network.Endpoint {
@@ -65,33 +47,33 @@ func (l *Listener) Stop() error {
 
 func NewPreconnection(e *network.Endpoint) (Preconnection, error) {
 	var (
-		listener network.Listener
-		dialer   network.Dialer
-		network  network.Network
-		p        Preconnection
-		err      error
+		l      network.Listener
+		dialer network.Dialer
+		net    network.Network
+		p      Preconnection
+		err    error
 	)
 	switch e.Transport {
-	case TRANSPORT_UDP:
-	case TRANSPORT_TCP:
-	case TRANSPORT_QUIC:
+	case network.TRANSPORT_UDP:
+	case network.TRANSPORT_TCP:
+	case network.TRANSPORT_QUIC:
 	default:
-		return p, errs.TransportType
+		return p, network.AddrTypeError
 	}
 
 	switch e.Network {
-	case NETWORK_IP, NETWORK_IPV4, NETWORK_IPV6:
-		network = ip.Network()
-	case NETWORK_SCION:
-		network = scion.Network()
+	case network.NETWORK_IP, network.NETWORK_IPV4, network.NETWORK_IPV6:
+		net = ip.Network()
+	case network.NETWORK_SCION:
+		net = scion.Network()
 	default:
-		return p, errs.NetworkType
+		return p, network.NetTypeError
 	}
 
 	if e.Local {
-		listener, err = network.NewListener(e)
+		l, err = net.NewListener(e)
 	} else {
-		dialer, err = network.NewDialer(e)
+		dialer, err = net.NewDialer(e)
 	}
 	if err != nil {
 		return p, err
@@ -99,7 +81,7 @@ func NewPreconnection(e *network.Endpoint) (Preconnection, error) {
 
 	p = Preconnection{
 		endpoint: e,
-		listener: listener,
+		listener: l,
 		dialer:   dialer,
 	}
 	return p, err

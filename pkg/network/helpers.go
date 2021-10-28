@@ -1,11 +1,9 @@
-package connection
+package network
 
 import (
 	"net"
 	"time"
 
-	"code.ovgu.de/hausheer/taps-api/glob"
-	"code.ovgu.de/hausheer/taps-api/network"
 	"github.com/lucas-clemente/quic-go"
 )
 
@@ -24,6 +22,13 @@ type conn interface {
 	Close() error
 }
 
+// TODO, placeholder stub implementation for message
+type DummyMessage string
+
+func (m DummyMessage) String() string {
+	return string(m)
+}
+
 type UDP struct {
 	conn  conn
 	laddr net.Addr
@@ -32,11 +37,11 @@ type UDP struct {
 	err   error
 }
 
-func NewUDP(conn conn, laddr, raddr net.Addr, write bool) network.Connection {
+func NewUDP(conn conn, laddr, raddr net.Addr, write bool) Connection {
 	return &UDP{conn, laddr, raddr, write, nil}
 }
 
-func (c *UDP) Send(message network.Message) error {
+func (c *UDP) Send(message Message) error {
 	var err error
 	if c.write {
 		_, err = c.conn.Write([]byte(message.String()))
@@ -46,15 +51,15 @@ func (c *UDP) Send(message network.Message) error {
 	return err
 }
 
-func (c *UDP) Receive() (network.Message, error) {
+func (c *UDP) Receive() (Message, error) {
 	var (
-		m   glob.Message
+		m   DummyMessage
 		n   int
 		err error
 	)
 	buffer := make([]byte, 1024)
 	n, c.raddr, err = c.conn.ReadFrom(buffer)
-	m = glob.Message(string(buffer[:n]))
+	m = DummyMessage(string(buffer[:n]))
 	return &m, err
 }
 
@@ -77,24 +82,24 @@ type TCP struct {
 	err   error
 }
 
-func NewTCP(conn *net.TCPConn, laddr, raddr net.Addr) network.Connection {
+func NewTCP(conn *net.TCPConn, laddr, raddr net.Addr) Connection {
 	return &TCP{conn, laddr, raddr, nil}
 }
 
-func (c *TCP) Send(message network.Message) error {
+func (c *TCP) Send(message Message) error {
 	_, err := c.conn.Write([]byte(message.String()))
 	return err
 }
 
-func (c *TCP) Receive() (network.Message, error) {
+func (c *TCP) Receive() (Message, error) {
 	var (
-		m   glob.Message
+		m   DummyMessage
 		n   int
 		err error
 	)
 	buffer := make([]byte, 1024)
 	n, err = c.conn.Read(buffer)
-	m = glob.Message(string(buffer[:n]))
+	m = DummyMessage(string(buffer[:n]))
 	return &m, err
 }
 
@@ -119,25 +124,25 @@ type QUIC struct {
 	err    error
 }
 
-func NewQUIC(conn quic.Session, stream quic.Stream, laddr, raddr net.Addr) network.Connection {
+func NewQUIC(conn quic.Session, stream quic.Stream, laddr, raddr net.Addr) Connection {
 	return &QUIC{conn, stream, laddr, raddr, time.Now().Add(-1 * timeout), nil}
 }
 
-func (c *QUIC) Send(message network.Message) error {
+func (c *QUIC) Send(message Message) error {
 	_, err := c.stream.Write([]byte(message.String()))
 	c.last = time.Now()
 	return err
 }
 
-func (c *QUIC) Receive() (network.Message, error) {
+func (c *QUIC) Receive() (Message, error) {
 	var (
-		m   glob.Message
+		m   DummyMessage
 		n   int
 		err error
 	)
 	buffer := make([]byte, 1024)
 	n, err = c.stream.Read(buffer)
-	m = glob.Message(string(buffer[:n]))
+	m = DummyMessage(string(buffer[:n]))
 	return &m, err
 }
 

@@ -1,10 +1,11 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"github.com/netsys-lab/panapi"
+	"github.com/netsys-lab/panapi/pkg/network"
 	"log"
-
-	"code.ovgu.de/hausheer/taps-api/taps"
 )
 
 func fcheck(err error) {
@@ -20,12 +21,19 @@ func check(err error) {
 }
 
 func main() {
-	var network, address, transport string
-	taps.GetFlags(&network, &address, &transport)
+	var net, address, transport string
 
-	RemoteSpecifier := taps.NewRemoteEndpoint()
+	flag.StringVar(&net, "n", network.NETWORK_IP, "network type")
+	flag.StringVar(&address, "a", "[127.0.0.1]:1337", "network address and port")
+	flag.StringVar(&transport, "t", network.TRANSPORT_TCP, "transport protocol")
 
-	RemoteSpecifier.WithNetwork(network)
+	flag.Parse()
+
+	//taps.GetFlags(&network, &address, &transport)
+
+	RemoteSpecifier := panapi.NewRemoteEndpoint()
+
+	RemoteSpecifier.WithNetwork(net)
 	RemoteSpecifier.WithAddress(address)
 	RemoteSpecifier.WithTransport(transport)
 
@@ -37,13 +45,13 @@ func main() {
 	// RemoteSpecifier.WithTransport(taps.TRANSPORT_TCP)
 	// RemoteSpecifier.WithTransport(taps.TRANSPORT_QUIC)
 
-	Preconnection, err := taps.NewPreconnection(RemoteSpecifier)
+	Preconnection, err := panapi.NewPreconnection(RemoteSpecifier)
 	fcheck(err)
 
 	Connection, err := Preconnection.Initiate()
 	fcheck(err)
 
-	err = Connection.Send(taps.Message("Hi from client!\n"))
+	err = Connection.Send(network.DummyMessage("Hi from client!\n"))
 	check(err)
 
 	Message, err := Connection.Receive()
