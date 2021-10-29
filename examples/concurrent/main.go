@@ -73,7 +73,6 @@ func runServer(net, t, local string) error {
 	LocalSpecifier.WithTransport(t)
 
 	Preconnection, err := panapi.NewPreconnection(LocalSpecifier)
-	log.Printf("%v, %v", Preconnection, err)
 	if err != nil {
 		return err
 	}
