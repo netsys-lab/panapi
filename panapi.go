@@ -28,11 +28,14 @@ func NewLocalEndpoint() *network.Endpoint {
 func (p *Preconnection) Listen() Listener {
 	c := make(chan network.Connection)
 	go func(p *Preconnection, c chan network.Connection) {
-		conn, err := p.listener.Listen()
-		if err != nil {
-			conn.SetError(err)
+		for {
+			conn, err := p.listener.Listen()
+			if err != nil {
+				conn.SetError(err)
+			} else {
+				c <- conn
+			}
 		}
-		c <- conn
 	}(p, c)
 	return Listener{ConnectionReceived: c, listener: p.listener}
 }

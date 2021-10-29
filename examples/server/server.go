@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/netsys-lab/panapi"
-	"github.com/netsys-lab/panapi/pkg/network"
+	"github.com/netsys-lab/panapi/network"
 	"log"
 )
 
