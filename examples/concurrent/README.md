@@ -47,3 +47,18 @@ Client:
 ## Example: Running over UDP
 
 _currently broken_
+
+Server:
+
+```bash
+./concurrent -net IP -transport UDP -local ":1337"
+```
+
+Client:
+
+```bash
+./concurrent -net IP -transport UDP -remote "127.0.0.1:1337"
+```
+
+
+
