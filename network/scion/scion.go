@@ -16,7 +16,7 @@ import (
 	"github.com/lucas-clemente/quic-go"
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 	"github.com/netsec-ethz/scion-apps/pkg/quicutil"
-	"github.com/netsys-lab/panapi/pkg/network"
+	"github.com/netsys-lab/panapi/network"
 )
 
 type UDPDialer struct {

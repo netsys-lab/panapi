@@ -1,9 +1,9 @@
 package panapi
 
 import (
-	"github.com/netsys-lab/panapi/pkg/network"
-	"github.com/netsys-lab/panapi/pkg/network/ip"
-	"github.com/netsys-lab/panapi/pkg/network/scion"
+	"github.com/netsys-lab/panapi/network"
+	"github.com/netsys-lab/panapi/network/ip"
+	"github.com/netsys-lab/panapi/network/scion"
 )
 
 type Preconnection struct {

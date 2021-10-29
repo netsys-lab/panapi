@@ -13,7 +13,7 @@ import (
 	"net"
 
 	"github.com/lucas-clemente/quic-go"
-	"github.com/netsys-lab/panapi/pkg/network"
+	"github.com/netsys-lab/panapi/network"
 )
 
 type UDPDialer struct {
