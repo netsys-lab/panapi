@@ -1,13 +1,20 @@
 package network
 
+import (
+	"io"
+	"net"
+)
+
 type Message interface {
 	String() string
 }
 
 type Connection interface {
+	io.ReadWriteCloser
 	Send(Message) error
 	Receive() (Message, error)
-	Close() error
+	LocalAddr() net.Addr
+	RemoteAddr() net.Addr
 	SetError(error)
 	GetError() error
 }

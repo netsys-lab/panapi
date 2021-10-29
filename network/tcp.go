@@ -32,8 +32,24 @@ func (c *TCP) Receive() (Message, error) {
 	return &m, err
 }
 
+func (c *TCP) Read(p []byte) (int, error) {
+	return c.conn.Read(p)
+}
+
+func (c *TCP) Write(p []byte) (int, error) {
+	return c.conn.Write(p)
+}
+
 func (c *TCP) Close() error {
 	return c.conn.Close()
+}
+
+func (c *TCP) LocalAddr() net.Addr {
+	return c.laddr
+}
+
+func (c *TCP) RemoteAddr() net.Addr {
+	return c.raddr
 }
 
 func (c *TCP) SetError(err error) {

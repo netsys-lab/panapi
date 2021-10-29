@@ -23,7 +23,7 @@ func NewQUIC(conn quic.Session, stream quic.Stream, laddr, raddr net.Addr) Conne
 }
 
 func (c *QUIC) Send(message Message) error {
-	_, err := c.stream.Write([]byte(message.String()))
+	_, err := c.Write([]byte(message.String()))
 	c.last = time.Now()
 	return err
 }
@@ -35,9 +35,17 @@ func (c *QUIC) Receive() (Message, error) {
 		err error
 	)
 	buffer := make([]byte, 1024)
-	n, err = c.stream.Read(buffer)
+	n, err = c.Read(buffer)
 	m = DummyMessage(string(buffer[:n]))
 	return &m, err
+}
+
+func (c *QUIC) Read(p []byte) (n int, err error) {
+	return c.stream.Read(p)
+}
+
+func (c *QUIC) Write(p []byte) (n int, err error) {
+	return c.stream.Write(p)
 }
 
 func (c *QUIC) Close() error {
@@ -45,6 +53,14 @@ func (c *QUIC) Close() error {
 		time.Sleep(timeStep)
 	}
 	return c.conn.CloseWithError(0, "connection closed.")
+}
+
+func (c *QUIC) LocalAddr() net.Addr {
+	return c.laddr
+}
+
+func (c *QUIC) RemoteAddr() net.Addr {
+	return c.raddr
 }
 
 func (c *QUIC) SetError(err error) {

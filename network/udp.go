@@ -19,11 +19,7 @@ func NewUDP(conn net.Conn, pconn net.PacketConn, laddr, raddr net.Addr) Connecti
 
 func (c *UDP) Send(message Message) error {
 	var err error
-	if c.conn != nil {
-		_, err = c.conn.Write([]byte(message.String()))
-	} else if c.pconn != nil {
-		_, err = c.pconn.WriteTo([]byte(message.String()), c.raddr)
-	}
+	_, err = c.Write([]byte(message.String()))
 	return err
 }
 
@@ -34,13 +30,27 @@ func (c *UDP) Receive() (Message, error) {
 		err error
 	)
 	buffer := make([]byte, 16*1024)
-	if c.pconn != nil {
-		n, c.raddr, err = c.pconn.ReadFrom(buffer)
-	} else if c.conn != nil {
-		n, err = c.conn.Read(buffer)
-	}
+	n, err = c.Read(buffer)
 	m = DummyMessage(string(buffer[:n]))
 	return &m, err
+}
+
+func (c *UDP) Read(p []byte) (n int, err error) {
+	if c.pconn != nil {
+		n, c.raddr, err = c.pconn.ReadFrom(p)
+	} else if c.conn != nil {
+		n, err = c.conn.Read(p)
+	}
+	return
+}
+
+func (c *UDP) Write(p []byte) (n int, err error) {
+	if c.conn != nil {
+		n, err = c.conn.Write(p)
+	} else if c.pconn != nil {
+		n, err = c.pconn.WriteTo(p, c.raddr)
+	}
+	return
 }
 
 func (c *UDP) Close() error {
@@ -59,4 +69,12 @@ func (c *UDP) SetError(err error) {
 
 func (c *UDP) GetError() error {
 	return c.err
+}
+
+func (c *UDP) LocalAddr() net.Addr {
+	return c.laddr
+}
+
+func (c *UDP) RemoteAddr() net.Addr {
+	return c.raddr
 }

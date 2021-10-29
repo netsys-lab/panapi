@@ -3,9 +3,12 @@ module github.com/netsys-lab/panapi
 go 1.17
 
 require (
+	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d
+	github.com/fatih/color v1.9.0
 	github.com/lucas-clemente/quic-go v0.24.0
 	github.com/netsec-ethz/scion-apps v0.4.0
 	github.com/scionproto/scion v0.6.1-0.20210929154253-764d6e2afe47
+	github.com/urfave/cli/v2 v2.3.0
 )
 
 require (
@@ -15,6 +18,7 @@ require (
 	github.com/britram/borat v0.0.0-20181011130314-f891bcfcfb9b // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
 	github.com/cheekybits/genny v1.0.0 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/dchest/cmac v0.0.0-20150527144652-62ff55a1048c // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-kit/kit v0.10.0 // indirect
@@ -40,6 +44,8 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.10.0 // indirect
 	github.com/prometheus/procfs v0.1.3 // indirect
+	github.com/russross/blackfriday/v2 v2.0.1 // indirect
+	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/uber/jaeger-client-go v2.29.1+incompatible // indirect
 	github.com/uber/jaeger-lib v2.0.0+incompatible // indirect
 	go.uber.org/atomic v1.7.0 // indirect
