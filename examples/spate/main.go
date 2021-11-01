@@ -160,6 +160,11 @@ func main() {
 						Usage:    "the server address to connect to\n\t\t(e.g., 17-ffaa:1:1,[127.0.0.1]:1337 / 0.0.0.0:1337)",
 						Required: true,
 					},
+					&cli.StringFlag{
+						Name:    "script",
+						Aliases: []string{},
+						Usage:   "the Lua script to use for path selection",
+					},
 				},
 				Action: func(c *cli.Context) error {
 					if c.Args().Present() {
@@ -201,6 +206,9 @@ func main() {
 						clientSpawner = clientSpawner.ServerAddress(c.String("address"))
 					}
 
+					if c.IsSet("script") {
+						clientSpawner = clientSpawner.Script(c.String("script"))
+					}
 					clientSpawner.Spawn()
 
 					return nil

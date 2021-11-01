@@ -13,8 +13,12 @@ func NewLocalEndpoint() *network.Endpoint {
 }
 
 // HACK, let's see if this works
-type TransportProperties network.TransportProperties
+type TransportProperties struct {
+	network.TransportProperties
+}
 
 func NewTransportProperties() *TransportProperties {
-	return &TransportProperties{}
+	return &TransportProperties{
+		*network.NewTransportProperties(),
+	}
 }

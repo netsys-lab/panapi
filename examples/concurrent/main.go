@@ -25,7 +25,7 @@ func check(err error) bool {
 
 func main() {
 	var (
-		n, remote, local, t string
+		n, remote, local, t, script string
 		//		port         uint
 	)
 
@@ -33,6 +33,7 @@ func main() {
 	flag.StringVar(&local, "local", "", "[Server] Local Address to listen on, (e.g. 17-ffaa:1:1,[127.0.0.1]:1337 or 0.0.0.0:1337, depending on chosen network type)")
 	flag.StringVar(&n, "net", network.NETWORK_IP, "network type")
 	flag.StringVar(&t, "transport", network.TRANSPORT_QUIC, "transport protocol")
+	flag.StringVar(&script, "script", "", "[Client] Lua script for path selection")
 	//flag.UintVar(&port, "port", 0, "[Server] local port to listen on")
 	flag.Parse()
 
@@ -45,7 +46,7 @@ func main() {
 	if len(local) > 0 {
 		check(runServer(n, t, local))
 	} else {
-		check(runClient(n, t, remote))
+		check(runClient(n, t, remote, script))
 	}
 }
 
@@ -88,13 +89,18 @@ func runServer(net, t, local string) error {
 
 }
 
-func runClient(net, t, remote string) error {
+func runClient(net, t, remote, script string) error {
 	RemoteSpecifier := panapi.NewRemoteEndpoint()
 	RemoteSpecifier.WithNetwork(net)
 	RemoteSpecifier.WithAddress(remote)
 	RemoteSpecifier.WithTransport(t)
 
-	Preconnection, err := panapi.NewPreconnection(RemoteSpecifier, nil)
+	TransportProperties := network.NewTransportProperties()
+	if script != "" {
+		TransportProperties.Set("lua-script", script)
+	}
+
+	Preconnection, err := panapi.NewPreconnection(RemoteSpecifier, TransportProperties)
 	if err != nil {
 		return err
 	}

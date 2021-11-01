@@ -22,6 +22,7 @@ type SpateClientSpawner struct {
 	interactive    bool
 	bandwidth      int64
 	parallel       int
+	script         string
 }
 
 // e.g. NewSpateClientSpawner("16-ffaa:0:1001,[172.31.0.23]:1337")
@@ -71,6 +72,11 @@ func (s SpateClientSpawner) Interactive(interactive bool) SpateClientSpawner {
 
 func (s SpateClientSpawner) Bandwidth(bandwidth int64) SpateClientSpawner {
 	s.bandwidth = bandwidth
+	return s
+}
+
+func (s SpateClientSpawner) Script(script string) SpateClientSpawner {
+	s.script = script
 	return s
 }
 
@@ -139,7 +145,13 @@ func (s SpateClientSpawner) Spawn() error {
 	rs.WithTransport(s.transport)
 	rs.WithAddress(s.server_address)
 
-	preconn, err := panapi.NewPreconnection(rs, nil)
+	tps := network.NewTransportProperties()
+	if s.script != "" {
+		Info("Attempting to load Lua path-selection script", s.script)
+		tps.Set("lua-script", s.script)
+	}
+
+	preconn, err := panapi.NewPreconnection(rs, tps)
 	if err != nil {
 		return err
 	}
