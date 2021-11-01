@@ -139,7 +139,7 @@ func (s SpateClientSpawner) Spawn() error {
 	rs.WithTransport(s.transport)
 	rs.WithAddress(s.server_address)
 
-	preconn, err := panapi.NewPreconnection(rs)
+	preconn, err := panapi.NewPreconnection(rs, nil)
 	if err != nil {
 		return err
 	}

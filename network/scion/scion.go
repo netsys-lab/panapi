@@ -128,7 +128,9 @@ func (l *QUICListener) Stop() error {
 	return nil
 }
 
-type scion struct{}
+type scion struct {
+	tp *network.TransportProperties
+}
 
 func (scion *scion) NewListener(e *network.Endpoint) (network.Listener, error) {
 	switch e.Transport {
@@ -152,8 +154,8 @@ func (scion *scion) NewDialer(e *network.Endpoint) (network.Dialer, error) {
 	}
 }
 
-func Network() network.Network {
-	return &scion{}
+func Network(tp *network.TransportProperties) network.Network {
+	return &scion{tp}
 }
 
 /*func generateTLSConfig() (*tls.Config, error) {

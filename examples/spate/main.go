@@ -122,7 +122,7 @@ func main() {
 						Name:        "parallel",
 						Aliases:     []string{"P"},
 						Usage:       "how many senders are sending in parallel on each path",
-						DefaultText: "8",
+						DefaultText: "1",
 					},
 					&cli.BoolFlag{
 						Name:        "single-path",

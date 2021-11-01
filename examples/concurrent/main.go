@@ -72,7 +72,7 @@ func runServer(net, t, local string) error {
 	LocalSpecifier.WithAddress(local)
 	LocalSpecifier.WithTransport(t)
 
-	Preconnection, err := panapi.NewPreconnection(LocalSpecifier)
+	Preconnection, err := panapi.NewPreconnection(LocalSpecifier, nil)
 	if err != nil {
 		return err
 	}
@@ -94,7 +94,7 @@ func runClient(net, t, remote string) error {
 	RemoteSpecifier.WithAddress(remote)
 	RemoteSpecifier.WithTransport(t)
 
-	Preconnection, err := panapi.NewPreconnection(RemoteSpecifier)
+	Preconnection, err := panapi.NewPreconnection(RemoteSpecifier, nil)
 	if err != nil {
 		return err
 	}
