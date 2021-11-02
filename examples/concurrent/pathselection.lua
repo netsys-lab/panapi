@@ -18,6 +18,7 @@ local pathstructure = {
    Source = "",
    Destination = "",
    Fingerprint = "",
+   Expiry = "",
    Metadata = {
       Interfaces = {
          {
@@ -39,8 +40,8 @@ local pathstructure = {
       InternalHops = { 0 },
       Notes = {
          "",
+         },
       },
-   },
 }
 
 function gopath2luapath(userdata, structure)
@@ -82,9 +83,17 @@ function rankpaths()
    table.sort(
       ranking,
       function(a, b)
-         return #paths[a].Metadata.Interfaces < #paths[b].Metadata.Interfaces
+         --return #paths[a].Metadata.Interfaces < #paths[b].Metadata.Interfaces
+         return paths[a].SumBandwidth > paths[b].SumBandwidth
       end
    )
+   --[[table.sort(
+      ranking,
+      function(a, b)
+         --return paths[a].Expiry < paths[b].Expiry
+         return paths[a].SumLatency < paths[b].SumLatency
+      end
+      )]]
 end
 
 
@@ -93,8 +102,19 @@ function setpaths(addr, ps)
    --tprint(gopath2luapath(ps, pathstructure))
    for index in ps() do
       path = ps[index]
-      paths[path] = gopath2luapath(path, pathstructure)
-      print("lua output: found path of length", #paths[path].Metadata.Interfaces)
+      luapath = gopath2luapath(path, pathstructure)
+      local bw = 0
+      for _,mbw in ipairs(luapath.Metadata.Bandwidth) do
+         bw = bw+mbw
+      end
+      luapath.SumBandwidth = bw
+      local ls = 0
+      for _,l in ipairs(luapath.Metadata.Latency) do
+         ls = ls+l
+      end
+      luapath.SumLatency = ls
+      paths[path] = luapath
+      tprint(paths[path])
       table.insert(ranking, path)
    end
    print(string.format("lua output: setpaths called with %s and %d paths", addr, #ranking))
@@ -106,7 +126,8 @@ end
 function selectpath()
    if #ranking > 0 then
       path = ranking[1]
-      print("lua output: selecting path", #paths[path].Metadata.Interfaces)
+      --print("lua output: selecting path with soonest expiry", paths[path].Expiry)
+      tprint(paths[path])
       return path
    else
       print("lua output: couldn't select a path")
@@ -118,30 +139,22 @@ function onpathdown(fp, pi)
    print(string.format("lua output: onpathdown called with fp %s and pi %s",
                        tostring(fp),
                        tostring(pi)))
-   panic("aaaah")
+   if paths[pi] == nil then
+      print("path is not known in database")
+      os.exit(1)
+   else
+      print("path is known in database, deleting")
+      paths[pi] = nil
+      for i,candidate in ipairs(ranking) do
+         if candidate == pi then
+            table.remove(ranking, i)
+            break
+         end
+      end
+      print("deleted path, exiting for introspection")
+      os.exit(0)
+   end
+      
+   
    -- todo, remove path from "database"
 end
-
-
--- just a helper function to print out everything we know
--- about a path
-function printpath2(path)
-   print(string.format([[lua output: got path %s with
-   source %s
-   destination %s
-   forwardingpath %s
-   metadata %s
-   fingerprint %s
-   expiry %s]],
-   tostring(path),
-   tostring(path.Source),
-   tostring(path.Destination),
-   tostring(path.ForwardingPath),
-   tostring(path.Metadata),
-   tostring(path.Fingerprint),
-   tostring(path.Expiry)))
-   for interface in path.Metadata.Interfaces() do
-      print(path.Metadata.Interfaces[interface].IA)
-   end
-end
-
