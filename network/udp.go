@@ -35,9 +35,38 @@ func (c *UDP) Receive() (Message, error) {
 	return &m, err
 }
 
+var AddrFromRead net.Addr
+
+// var Conn net.PacketConn
+// var UdpErr error
+
 func (c *UDP) Read(p []byte) (n int, err error) {
+
+	// laddr := &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1337}
+	// if Conn == nil {
+	// 	Conn, UdpErr = net.ListenPacket("udp", "127.0.0.1:1333")
+	// }
+
+	// if UdpErr != nil {
+	// 	return 0, UdpErr
+	// }
+
+	// // conn.ReadFrom(p)
+
+	// n, from, err := Conn.ReadFrom(p)
+	// Conn.Close()
+	// if err != nil {
+	// 	return 0, err
+	// }
+	// data := p[:n]
+	// fmt.Printf("Received %s: %s\n", from, data)
+	// AddrFromRead = from
+
+	// return n, nil
+
 	if c.pconn != nil {
 		n, c.raddr, err = c.pconn.ReadFrom(p)
+		AddrFromRead = c.raddr
 	} else if c.conn != nil {
 		n, err = c.conn.Read(p)
 	}
@@ -47,8 +76,12 @@ func (c *UDP) Read(p []byte) (n int, err error) {
 func (c *UDP) Write(p []byte) (n int, err error) {
 	if c.conn != nil {
 		n, err = c.conn.Write(p)
-	} else if c.pconn != nil {
-		n, err = c.pconn.WriteTo(p, c.raddr)
+	} else if c.pconn != nil && AddrFromRead != nil {
+		// newCon, newConErr := net.Dial("udp", AddrFromRead.String())
+		// if newConErr != nil {
+		// 	return 0, newConErr
+		// }
+		n, err = c.pconn.WriteTo(p, AddrFromRead)
 	}
 	return
 }
