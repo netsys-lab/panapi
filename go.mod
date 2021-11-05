@@ -9,6 +9,10 @@ require (
 	github.com/netsec-ethz/scion-apps v0.4.0
 	github.com/scionproto/scion v0.6.1-0.20210929154253-764d6e2afe47
 	github.com/urfave/cli/v2 v2.3.0
+	github.com/yuin/gopher-lua v0.0.0-20210529063254-f4c35e4016d9
+	google.golang.org/grpc v1.38.1
+	google.golang.org/protobuf v1.26.0
+	layeh.com/gopher-luar v1.0.10
 )
 
 require (
@@ -48,7 +52,6 @@ require (
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/uber/jaeger-client-go v2.29.1+incompatible // indirect
 	github.com/uber/jaeger-lib v2.0.0+incompatible // indirect
-	github.com/yuin/gopher-lua v0.0.0-20210529063254-f4c35e4016d9 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.17.0 // indirect
@@ -60,15 +63,12 @@ require (
 	golang.org/x/tools v0.1.2 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c // indirect
-	google.golang.org/grpc v1.38.1 // indirect
 	google.golang.org/grpc/examples v0.0.0-20211026221136-9fa269826495 // indirect
-	google.golang.org/protobuf v1.26.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	layeh.com/gopher-luar v1.0.10 // indirect
 )
 
 replace (
-	github.com/netsec-ethz/scion-apps => github.com/netsys-lab/scion-apps v0.1.1-0.20211028160146-ad46bc4eb824
+	github.com/netsec-ethz/scion-apps => github.com/netsys-lab/scion-apps v0.1.1-0.20211104195016-a09c318e9786
 	github.com/scionproto/scion => github.com/netsec-ethz/scion v0.0.0-20211005155700-e5719e3cd5ed
 )

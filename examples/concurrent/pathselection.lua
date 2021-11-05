@@ -44,6 +44,7 @@ local pathstructure = {
       },
 }
 
+-- parse userdata into lua-native table structure
 function gopath2luapath(userdata, structure)
    if type(structure) == "string" then
       return tostring(userdata)
@@ -83,15 +84,15 @@ function rankpaths()
    table.sort(
       ranking,
       function(a, b)
-         --return #paths[a].Metadata.Interfaces < #paths[b].Metadata.Interfaces
-         return paths[a].SumBandwidth > paths[b].SumBandwidth
+         return #paths[a].Metadata.Interfaces < #paths[b].Metadata.Interfaces
+         --return paths[a].SumBandwidth > paths[b].SumBandwidth
       end
    )
    --[[table.sort(
       ranking,
       function(a, b)
-         --return paths[a].Expiry < paths[b].Expiry
-         return paths[a].SumLatency < paths[b].SumLatency
+         return paths[a].Expiry < paths[b].Expiry
+         --return paths[a].SumLatency < paths[b].SumLatency
       end
       )]]
 end
@@ -103,18 +104,25 @@ function setpaths(addr, ps)
    for index in ps() do
       path = ps[index]
       luapath = gopath2luapath(path, pathstructure)
+      
+      -- sum over bandwidth
       local bw = 0
       for _,mbw in ipairs(luapath.Metadata.Bandwidth) do
          bw = bw+mbw
       end
       luapath.SumBandwidth = bw
+
+      -- sum over latency
       local ls = 0
       for _,l in ipairs(luapath.Metadata.Latency) do
          ls = ls+l
       end
       luapath.SumLatency = ls
+      
       paths[path] = luapath
+      -- debug print
       tprint(paths[path])
+
       table.insert(ranking, path)
    end
    print(string.format("lua output: setpaths called with %s and %d paths", addr, #ranking))
@@ -127,7 +135,7 @@ function selectpath()
    if #ranking > 0 then
       path = ranking[1]
       --print("lua output: selecting path with soonest expiry", paths[path].Expiry)
-      tprint(paths[path])
+      --tprint(paths[path])
       return path
    else
       print("lua output: couldn't select a path")
@@ -135,13 +143,24 @@ function selectpath()
 end
 
 -- gets called whenever a path disappears(?)
+-- TODO tidy this up
 function onpathdown(fp, pi)
    print(string.format("lua output: onpathdown called with fp %s and pi %s",
                        tostring(fp),
                        tostring(pi)))
    if paths[pi] == nil then
       print("path is not known in database")
-      os.exit(1)
+      for ud,path in pairs(paths) do
+         if path.Fingerprint == tostring(fp) then
+            print("found path via fingerprint")
+            paths[ud] = nil
+            for i,candidate in ipairs(ranking) do
+               if candidate == path then
+                  table.remove(ranking, i)
+               end
+            end
+         end
+      end
    else
       print("path is known in database, deleting")
       paths[pi] = nil
@@ -151,10 +170,9 @@ function onpathdown(fp, pi)
             break
          end
       end
-      print("deleted path, exiting for introspection")
-      os.exit(0)
    end
-      
+   print("deleted path, exiting for introspection")
+   os.exit(0)
    
    -- todo, remove path from "database"
 end

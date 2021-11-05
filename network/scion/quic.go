@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"log"
 	"net"
+	//"time"
 
 	"github.com/lucas-clemente/quic-go"
 
@@ -12,6 +13,7 @@ import (
 
 	"github.com/netsec-ethz/scion-apps/pkg/quicutil"
 	"github.com/netsys-lab/panapi/network"
+	"github.com/netsys-lab/panapi/rpc"
 )
 
 type QUICDialer struct {
@@ -27,7 +29,13 @@ func getSelector(tp *network.TransportProperties) (selector pan.Selector, err er
 				return
 			}
 		} else {
-			log.Println("no selector script found in transport properties")
+			//log.Println("no selector script found in transport properties")
+			log.Println("using daemon selector")
+			selector, err = rpc.NewSelectorClient() //daemon.NewDaemonSelector("/tmp/panapid.sock")
+			//selector, err = debug.NewDebugSelector(time.Millisecond, nil)
+			if err != nil {
+				return
+			}
 		}
 	} else {
 		log.Println("no transport properties given")
@@ -58,10 +66,12 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 	log.Printf("%+v", d.selector)
 	conn, err := pan.DialQUIC(context.Background(), nil, d.raddr, nil, d.selector, "", tlsConf, nil)
 	if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 	stream, err := conn.OpenStream() //Sync(context.Background())
 	if err != nil {
+		log.Println(err)
 		return nil, err
 	}
 	return network.NewQUIC(conn, stream, conn.LocalAddr(), conn.RemoteAddr()), nil
