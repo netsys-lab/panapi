@@ -4,6 +4,10 @@ import (
 	"github.com/netsys-lab/panapi/network"
 )
 
+const (
+	DaemonSocketPath = "/tmp/panapi.sock"
+)
+
 func NewRemoteEndpoint() *network.Endpoint {
 	return &network.Endpoint{Local: false}
 }

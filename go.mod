@@ -10,8 +10,6 @@ require (
 	github.com/scionproto/scion v0.6.1-0.20210929154253-764d6e2afe47
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/yuin/gopher-lua v0.0.0-20210529063254-f4c35e4016d9
-	google.golang.org/grpc v1.38.1
-	google.golang.org/protobuf v1.26.0
 	layeh.com/gopher-luar v1.0.10
 )
 
@@ -63,7 +61,9 @@ require (
 	golang.org/x/tools v0.1.2 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c // indirect
+	google.golang.org/grpc v1.38.1 // indirect
 	google.golang.org/grpc/examples v0.0.0-20211026221136-9fa269826495 // indirect
+	google.golang.org/protobuf v1.26.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

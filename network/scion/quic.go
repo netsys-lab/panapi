@@ -31,11 +31,13 @@ func getSelector(tp *network.TransportProperties) (selector pan.Selector, err er
 		} else {
 			//log.Println("no selector script found in transport properties")
 			log.Println("using daemon selector")
-			selector, err = rpc.NewSelectorClient() //daemon.NewDaemonSelector("/tmp/panapid.sock")
-			//selector, err = debug.NewDebugSelector(time.Millisecond, nil)
+			var conn *net.UnixConn
+			conn, err = net.DialUnix("unix", nil, rpc.DefaultDaemonAddress)
 			if err != nil {
 				return
 			}
+			selector = rpc.NewSelectorClient(conn)
+			return
 		}
 	} else {
 		log.Println("no transport properties given")

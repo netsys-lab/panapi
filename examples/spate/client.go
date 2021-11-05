@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	//"runtime/pprof"
+
 	"github.com/fatih/color"
 	"github.com/netsys-lab/panapi"
 	"github.com/netsys-lab/panapi/network"
@@ -136,6 +138,17 @@ func (s SpateClientSpawner) Spawn() error {
 			paths = paths[:1]
 		}
 	}*/
+	/*f, err := os.Create("cpuprofile")
+	if err != nil {
+		Error("could not create cpuprofile:", err)
+		panic(err)
+	}
+	defer f.Close()
+	if err := pprof.StartCPUProfile(f); err != nil {
+		Error("could not start CPU profile:", err)
+		panic(err)
+	}
+	defer pprof.StopCPUProfile()*/
 
 	paths := []int{1}
 	Info("Choosing the following paths: %v", paths)
