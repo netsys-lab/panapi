@@ -2,8 +2,10 @@ package scion
 
 import (
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
+	"github.com/netsys-lab/panapi/rpc"
 	"github.com/yuin/gopher-lua"
 	"layeh.com/gopher-luar"
+
 	"log"
 	"sync"
 )
@@ -13,7 +15,8 @@ type LuaSelector struct {
 	L     *lua.LState
 }
 
-func NewLuaSelector(script string) (*LuaSelector, error) {
+//func NewLuaSelector(script string) (*LuaSelector, error) {
+func NewLuaSelector(script string) (rpc.ServerSelector, error) {
 	//initialize Lua VM
 	L := lua.NewState()
 	//load script
@@ -25,14 +28,16 @@ func NewLuaSelector(script string) (*LuaSelector, error) {
 	return &selector, nil
 }
 
-func (s *LuaSelector) Path() *pan.Path {
+func (s *LuaSelector) Path(raddr pan.UDPAddr) *pan.Path {
 	//log.Println("Path()")
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	//call the "selectpath" function from the Lua script
 	//expect 1 return value
-	s.L.CallByParam(lua.P{Fn: s.L.GetGlobal("selectpath"), NRet: 1})
+	s.L.CallByParam(lua.P{
+		Fn:   s.L.GetGlobal("selectpath"),
+		NRet: 1}, luar.New(s.L, raddr))
 	//convert top of the stack back to a UserData type
 	lv := s.L.ToUserData(-1)
 	//pop element from the stack
@@ -47,7 +52,7 @@ func (s *LuaSelector) Path() *pan.Path {
 	}
 }
 
-func (s *LuaSelector) SetPaths(addr pan.UDPAddr, paths []*pan.Path) {
+func (s *LuaSelector) SetPaths(raddr pan.UDPAddr, paths []*pan.Path) {
 	log.Println("SetPaths()")
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -57,25 +62,34 @@ func (s *LuaSelector) SetPaths(addr pan.UDPAddr, paths []*pan.Path) {
 	//and don't expect a return value
 	s.L.CallByParam(lua.P{
 		Fn:   s.L.GetGlobal("setpaths"),
-		NRet: 0}, luar.New(s.L, addr), luar.New(s.L, paths))
+		NRet: 0}, luar.New(s.L, raddr), luar.New(s.L, paths))
 }
 
-func (s *LuaSelector) OnPathDown(fp pan.PathFingerprint, pi pan.PathInterface) {
+func (s *LuaSelector) OnPathDown(raddr pan.UDPAddr, fp pan.PathFingerprint, pi pan.PathInterface) {
 	log.Println("OnPathDown()")
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	//call the "onpathdown" function in the Lua script
 	//with two arguments
 	//and don't expect a return value
-	s.L.CallByParam(lua.P{
+	err := s.L.CallByParam(lua.P{
 		Fn:   s.L.GetGlobal("onpathdown"),
-		NRet: 0}, luar.New(s.L, fp), luar.New(s.L, pi))
+		NRet: 0}, luar.New(s.L, raddr), luar.New(s.L, fp), luar.New(s.L, pi))
 
-	log.Printf("OnPathDown called with fp %v and pi %v", fp, pi)
+	log.Printf("OnPathDown called with fp %v and pi %v: %s", fp, pi, err)
 }
 
-func (s *LuaSelector) Close() error {
-	log.Println("Close called on LuaSelector")
-	s.L.Close()
-	return nil
+func (s *LuaSelector) Close(raddr pan.UDPAddr) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	//call the "selectpath" function from the Lua script
+	//expect 1 return value
+	err := s.L.CallByParam(lua.P{
+		Fn:   s.L.GetGlobal("close"),
+		NRet: 1}, luar.New(s.L, raddr))
+
+	log.Println("Close called on LuaSelector:", err)
+	//s.L.Close()
+	return err
 }
