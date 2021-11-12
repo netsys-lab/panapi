@@ -79,6 +79,7 @@ ranking = {}
 times = {}
 switchover = 10
 oldpaths = {}
+stepsize = 1
 
 print("Hello SelectionServer")
 
@@ -115,6 +116,8 @@ function setpaths(addr, ps)
       --tprint(paths[path])
       table.insert(ranking, path)
    end
+   stepsize = math.ceil(#ranking / switchover)
+   print("stepsize", stepsize, "paths", #ranking)
    --print(string.format("lua output: setpaths called with %s and %d paths", addr, #ranking))
    rankpaths()
 end
@@ -125,9 +128,10 @@ function selectpath(addr)
    addr = tostring(addr)
    if #ranking > 0 then
       -- switch to new path every 10 seconds
-      path = ranking[math.floor((os.time() - times[addr]) / switchover) + 1]
+      t = (os.time() - times[addr])
+      path = ranking[math.floor(t / switchover) * stepsize + 1]
       if path ~= oldpaths[addr] then
-         print("lua output: selecting new path with ", paths[path].Fingerprint)
+         print("lua output: selecting new path with ", paths[path].Fingerprint, "at time", t)
          oldpaths[addr] = path
       end
       return path
