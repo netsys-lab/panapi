@@ -126,7 +126,7 @@ func (s *SelectorServer) SetPaths(args, resp *Msg) error {
 
 func (s *SelectorServer) Path(args, resp *Msg) error {
 	//log.Println("Path invoked")
-	log.Printf("%+v", args)
+	//log.Printf("%+v", args)
 	p := s.selector.Path(*args.Remote)
 	//fmt.Printf("%+v", resp)
 	resp.Fingerprint = &p.Fingerprint

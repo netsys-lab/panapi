@@ -3,11 +3,17 @@ package scion
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
+	"io"
 	"log"
 	"net"
+	"os"
+
 	//"time"
 
 	"github.com/lucas-clemente/quic-go"
+	"github.com/lucas-clemente/quic-go/logging"
+	"github.com/lucas-clemente/quic-go/qlog"
 
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 
@@ -66,7 +72,18 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 		NextProtos:         []string{"panapi-quic-test"},
 	}
 	log.Printf("%+v", d.selector)
-	conn, err := pan.DialQUIC(context.Background(), nil, d.raddr, nil, d.selector, "", tlsConf, nil)
+	conn, err := pan.DialQUIC(context.Background(), nil, d.raddr, nil, d.selector, "", tlsConf, &quic.Config{
+		Tracer: qlog.NewTracer(func(p logging.Perspective, connectionID []byte) io.WriteCloser {
+			fname := fmt.Sprintf("/tmp/quic-tracer-%d-%x.log", p, connectionID)
+			log.Println("quic tracer file opened as", fname)
+			f, err := os.Create(fname)
+			if err != nil {
+				panic(err)
+			}
+			return f
+		}),
+	})
+
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -106,7 +123,17 @@ func NewQUICListener(address string, tp *network.TransportProperties) (*QUICList
 	if err != nil {
 		return nil, err
 	}
-	listener, err := pan.ListenQUIC(context.Background(), &net.UDPAddr{Port: addr.Port}, nil, tlsConf, nil)
+	listener, err := pan.ListenQUIC(context.Background(), &net.UDPAddr{Port: addr.Port}, nil, tlsConf, &quic.Config{
+		Tracer: qlog.NewTracer(func(p logging.Perspective, connectionID []byte) io.WriteCloser {
+			fname := fmt.Sprintf("/tmp/quic-tracer-%d-%x.log", p, connectionID)
+			log.Println("quic tracer file opened as", fname)
+			f, err := os.Create(fname)
+			if err != nil {
+				panic(err)
+			}
+			return f
+		}),
+	})
 	if err != nil {
 		return nil, err
 	}

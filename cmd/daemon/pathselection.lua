@@ -76,6 +76,10 @@ end
 -- not directly referenced from go
 paths = {}
 ranking = {}
+times = {}
+switchover = 10
+oldpaths = {}
+
 print("Hello SelectionServer")
 
 
@@ -97,7 +101,10 @@ end
 
 -- gets called when a set of paths to addr is known
 function setpaths(addr, ps)
-   print("setpath", tostring(addr))
+   addr = tostring(addr)
+   print("setpath", addr)
+   times[addr] = os.time()
+
    --tprint(gopath2luapath(ps, pathstructure))
    for index in ps() do
       path = ps[index]
@@ -115,10 +122,14 @@ end
 -- gets called for every packet
 -- implementation needs to be efficient
 function selectpath(addr)
-   print("selectpath", tostring(addr))
+   addr = tostring(addr)
    if #ranking > 0 then
-      path = ranking[1]
-      --print("lua output: selecting path with soonest expiry", paths[path].Expiry)
+      -- switch to new path every 10 seconds
+      path = ranking[math.floor((os.time() - times[addr]) / switchover) + 1]
+      if path ~= oldpaths[addr] then
+         print("lua output: selecting new path with ", paths[path].Fingerprint)
+         oldpaths[addr] = path
+      end
       return path
    else
       print("lua output: couldn't select a path")
