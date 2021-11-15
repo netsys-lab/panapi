@@ -54,14 +54,19 @@ func worker(conn network.Connection) {
 	ticker := time.Tick(time.Second)
 
 	for check(conn.GetError()) {
-		if !check(conn.Send(network.DummyMessage((<-ticker).String()))) {
-			break
-		}
-		m, err := conn.Receive()
+		request, err := network.NewLineMessageString((<-ticker).String())
 		if !check(err) {
 			break
 		}
-		log.Printf("Message: %s\n", m)
+		if !check(conn.Send(request)) {
+			break
+		}
+		response := network.NewLineMessage()
+		err = conn.Receive(response)
+		if !check(err) {
+			break
+		}
+		log.Printf("Message: %s", response)
 	}
 
 }
