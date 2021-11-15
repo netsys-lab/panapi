@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	//"time"
 
@@ -25,6 +26,7 @@ import (
 type QUICDialer struct {
 	raddr    pan.UDPAddr
 	selector pan.Selector
+	tp       *network.TransportProperties
 }
 
 func getSelector(tp *network.TransportProperties) (selector pan.Selector, err error) {
@@ -62,7 +64,7 @@ func NewQUICDialer(address string, tp *network.TransportProperties) (*QUICDialer
 		return nil, err
 	}
 	addr, err = pan.ResolveUDPAddr(address)
-	return &QUICDialer{addr, selector}, err
+	return &QUICDialer{addr, selector, tp}, err
 }
 
 func (d *QUICDialer) Dial() (network.Connection, error) {
@@ -71,10 +73,10 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"panapi-quic-test"},
 	}
-	log.Printf("%+v", d.selector)
+	//log.Printf("%+v", d.selector)
 	conn, err := pan.DialQUIC(context.Background(), nil, d.raddr, nil, d.selector, "", tlsConf, &quic.Config{
 		Tracer: qlog.NewTracer(func(p logging.Perspective, connectionID []byte) io.WriteCloser {
-			fname := fmt.Sprintf("/tmp/quic-tracer-%d-%x.log", p, connectionID)
+			fname := fmt.Sprintf("/tmp/%s-%x-quic-dialer-%d.log", connectionID, time.Now().Format("2006-01-02-15-04"), p)
 			log.Println("quic tracer file opened as", fname)
 			f, err := os.Create(fname)
 			if err != nil {
@@ -125,7 +127,7 @@ func NewQUICListener(address string, tp *network.TransportProperties) (*QUICList
 	}
 	listener, err := pan.ListenQUIC(context.Background(), &net.UDPAddr{Port: addr.Port}, nil, tlsConf, &quic.Config{
 		Tracer: qlog.NewTracer(func(p logging.Perspective, connectionID []byte) io.WriteCloser {
-			fname := fmt.Sprintf("/tmp/quic-tracer-%d-%x.log", p, connectionID)
+			fname := fmt.Sprintf("/tmp/%s-%x-quic-listener-%d.log", connectionID, time.Now().Format("2006-01-02-15-04"), p)
 			log.Println("quic tracer file opened as", fname)
 			f, err := os.Create(fname)
 			if err != nil {

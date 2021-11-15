@@ -50,12 +50,14 @@ def fromTo(frame, field):
     t = 0
     l = []
     for now, p in zip(frame.index, frame[field]):
-        if p > last+1:
-            if f != t:
-                l.append((f,t))
-            f = now
-        t = now
-        last = p
+        l.append((now, now+200))
+    #     if p > last+1:
+    #         if f != t:
+    #             l.append((f,t))
+    #         f = now
+    #     t = now
+    #     last = p
+    # print(l)
     return l    
         
 
@@ -65,7 +67,7 @@ ts3 = d["transport:packet_sent:frames:partial"]
 ts4 = d["recovery:loss_timer_updated"]
 
 #ts = pd.concat([filterDataFrame(ts1,["bytes_in_flight", "min_rtt", "smoothed_rtt", "latest_rtt"]),
-ts = pd.concat([filterDataFrame(ts1,["smoothed_rtt", "latest_rtt"]),
+ts = pd.concat([filterDataFrame(ts1,["smoothed_rtt"]), #, "latest_rtt"]),
                 #filterDataFrame(ts2,["ack_delay"],["received_ack_delay"]),
                 #filterDataFrame(ts3,["ack_delay"],["sent_ack_delay"]),
                 #filterDataFrame(ts4,["delta"]),
@@ -78,14 +80,16 @@ ts = pd.concat([filterDataFrame(ts1,["smoothed_rtt", "latest_rtt"]),
 ts.plot(subplots=False,
         #y=["bytes_in_flight", "min_rtt", "smoothed_rtt", "latest_rtt", "ack_delay"],
         xticks=range(0, int(ts.index[-1]), int(ts.index[-1])//1000*100),
-        ylim=(100,300),
-        linestyle="solid",
+        #ylim=(100,300),
+        linestyle="None",
         marker=".",
         )
 
 loss = d.get("recovery:packet_lost:header")
-if loss != None:
-    for f, to in fromTo(loss, "packet_number"):
-        plt.axvspan(f,to, facecolor="red", alpha=.2)
+for f, to in fromTo(loss, "packet_number"):
+    plt.axvspan(f,to, facecolor="red", alpha=.2)
 
+#for a,b in zip(range(0,60,20), range(10,70,20)):
+#    plt.axvspan(a*1000,b*1000, facecolor="green", alpha=.2)
+    
 plt.show()
