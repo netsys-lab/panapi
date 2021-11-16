@@ -76,7 +76,7 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 	//log.Printf("%+v", d.selector)
 	conn, err := pan.DialQUIC(context.Background(), nil, d.raddr, nil, d.selector, "", tlsConf, &quic.Config{
 		Tracer: qlog.NewTracer(func(p logging.Perspective, connectionID []byte) io.WriteCloser {
-			fname := fmt.Sprintf("/tmp/%s-%x-quic-dialer-%d.log", connectionID, time.Now().Format("2006-01-02-15-04"), p)
+			fname := fmt.Sprintf("/tmp/%s-%x-quic-dialer-%d.log", time.Now().Format("2006-01-02-15-04"), connectionID, p)
 			log.Println("quic tracer file opened as", fname)
 			f, err := os.Create(fname)
 			if err != nil {
@@ -127,7 +127,7 @@ func NewQUICListener(address string, tp *network.TransportProperties) (*QUICList
 	}
 	listener, err := pan.ListenQUIC(context.Background(), &net.UDPAddr{Port: addr.Port}, nil, tlsConf, &quic.Config{
 		Tracer: qlog.NewTracer(func(p logging.Perspective, connectionID []byte) io.WriteCloser {
-			fname := fmt.Sprintf("/tmp/%s-%x-quic-listener-%d.log", connectionID, time.Now().Format("2006-01-02-15-04"), p)
+			fname := fmt.Sprintf("/tmp/%s-%x-quic-listener-%d.log", time.Now().Format("2006-01-02-15-04"), connectionID, p)
 			log.Println("quic tracer file opened as", fname)
 			f, err := os.Create(fname)
 			if err != nil {
