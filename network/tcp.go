@@ -1,6 +1,7 @@
 package network
 
 import (
+	"io"
 	"net"
 )
 
@@ -16,20 +17,13 @@ func NewTCP(conn *net.TCPConn, laddr, raddr net.Addr) Connection {
 }
 
 func (c *TCP) Send(message Message) error {
-	_, err := c.conn.Write([]byte(message.String()))
+	_, err := io.Copy(c.conn, message)
 	return err
 }
 
-func (c *TCP) Receive() (Message, error) {
-	var (
-		m   DummyMessage
-		n   int
-		err error
-	)
-	buffer := make([]byte, 1024)
-	n, err = c.conn.Read(buffer)
-	m = DummyMessage(string(buffer[:n]))
-	return &m, err
+func (c *TCP) Receive(m Message) error {
+	_, err := io.Copy(m, c.conn)
+	return err
 }
 
 func (c *TCP) Read(p []byte) (int, error) {

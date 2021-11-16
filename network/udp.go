@@ -1,6 +1,7 @@
 package network
 
 import (
+	"io"
 	"net"
 )
 
@@ -18,21 +19,13 @@ func NewUDP(conn net.Conn, pconn net.PacketConn, laddr, raddr net.Addr) Connecti
 }
 
 func (c *UDP) Send(message Message) error {
-	var err error
-	_, err = c.Write([]byte(message.String()))
+	_, err := io.Copy(c, message)
 	return err
 }
 
-func (c *UDP) Receive() (Message, error) {
-	var (
-		m   DummyMessage
-		n   int
-		err error
-	)
-	buffer := make([]byte, 16*1024)
-	n, err = c.Read(buffer)
-	m = DummyMessage(string(buffer[:n]))
-	return &m, err
+func (c *UDP) Receive(m Message) error {
+	_, err := io.Copy(m, c)
+	return err
 }
 
 func (c *UDP) Read(p []byte) (n int, err error) {

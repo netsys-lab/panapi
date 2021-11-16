@@ -1,9 +1,11 @@
 package network
 
 import (
-	"github.com/lucas-clemente/quic-go"
+	"io"
 	"net"
 	"time"
+
+	"github.com/lucas-clemente/quic-go"
 )
 
 var timeout = 1 * time.Second
@@ -23,21 +25,18 @@ func NewQUIC(conn quic.Session, stream quic.Stream, laddr, raddr net.Addr) Conne
 }
 
 func (c *QUIC) Send(message Message) error {
-	_, err := c.Write([]byte(message.String()))
+	_, err := io.Copy(c.stream, message)
 	c.last = time.Now()
 	return err
 }
 
-func (c *QUIC) Receive() (Message, error) {
-	var (
-		m   DummyMessage
-		n   int
-		err error
-	)
-	buffer := make([]byte, 1024)
-	n, err = c.Read(buffer)
-	m = DummyMessage(string(buffer[:n]))
-	return &m, err
+func (c *QUIC) Receive(message Message) error {
+	_, err := io.Copy(message, c.stream)
+	if err == EOM {
+		// End Of Message, not an error we need to propergate beyond this point
+		err = nil
+	}
+	return err
 }
 
 func (c *QUIC) Read(p []byte) (n int, err error) {
