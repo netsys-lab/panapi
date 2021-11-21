@@ -7,12 +7,13 @@ import (
 
 type Message interface {
 	String() string
+	io.ReadWriter
 }
 
 type Connection interface {
 	io.ReadWriteCloser
 	Send(Message) error
-	Receive() (Message, error)
+	Receive(Message) error
 	LocalAddr() net.Addr
 	RemoteAddr() net.Addr
 	SetError(error)

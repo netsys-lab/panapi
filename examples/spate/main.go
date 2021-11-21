@@ -122,7 +122,7 @@ func main() {
 						Name:        "parallel",
 						Aliases:     []string{"P"},
 						Usage:       "how many senders are sending in parallel on each path",
-						DefaultText: "8",
+						DefaultText: "1",
 					},
 					&cli.BoolFlag{
 						Name:        "single-path",
@@ -159,6 +159,11 @@ func main() {
 						Aliases:  []string{"a", "addr"},
 						Usage:    "the server address to connect to\n\t\t(e.g., 17-ffaa:1:1,[127.0.0.1]:1337 / 0.0.0.0:1337)",
 						Required: true,
+					},
+					&cli.StringFlag{
+						Name:    "script",
+						Aliases: []string{},
+						Usage:   "the Lua script to use for path selection",
 					},
 				},
 				Action: func(c *cli.Context) error {
@@ -201,6 +206,9 @@ func main() {
 						clientSpawner = clientSpawner.ServerAddress(c.String("address"))
 					}
 
+					if c.IsSet("script") {
+						clientSpawner = clientSpawner.Script(c.String("script"))
+					}
 					clientSpawner.Spawn()
 
 					return nil
