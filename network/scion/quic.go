@@ -3,22 +3,23 @@ package scion
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
-	"io"
+	//"fmt"
+	//	"io"
 	"log"
 	"net"
-	"os"
-	"time"
+	//	"os"
+	//	"time"
 
 	//"time"
 
 	"github.com/lucas-clemente/quic-go"
-	"github.com/lucas-clemente/quic-go/logging"
-	"github.com/lucas-clemente/quic-go/qlog"
+	//	"github.com/lucas-clemente/quic-go/logging"
+	//	"github.com/lucas-clemente/quic-go/qlog"
 
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 
 	"github.com/netsec-ethz/scion-apps/pkg/quicutil"
+	"github.com/netsys-lab/panapi/internal/stats"
 	"github.com/netsys-lab/panapi/network"
 	"github.com/netsys-lab/panapi/rpc"
 )
@@ -75,7 +76,7 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 	}
 	//log.Printf("%+v", d.selector)
 	conn, err := pan.DialQUIC(context.Background(), nil, d.raddr, nil, d.selector, "", tlsConf, &quic.Config{
-		Tracer: qlog.NewTracer(func(p logging.Perspective, connectionID []byte) io.WriteCloser {
+		/*Tracer: qlog.NewTracer(func(p logging.Perspective, connectionID []byte) io.WriteCloser {
 			fname := fmt.Sprintf("/tmp/%s-%x-quic-dialer-%d.log", time.Now().Format("2006-01-02-15-04"), connectionID, p)
 			log.Println("quic tracer file opened as", fname)
 			f, err := os.Create(fname)
@@ -83,7 +84,8 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 				panic(err)
 			}
 			return f
-		}),
+		}),*/
+		Tracer: stats.NewTracer(d.raddr),
 	})
 
 	if err != nil {
@@ -126,7 +128,7 @@ func NewQUICListener(address string, tp *network.TransportProperties) (*QUICList
 		return nil, err
 	}
 	listener, err := pan.ListenQUIC(context.Background(), &net.UDPAddr{Port: addr.Port}, nil, tlsConf, &quic.Config{
-		Tracer: qlog.NewTracer(func(p logging.Perspective, connectionID []byte) io.WriteCloser {
+		/*Tracer: qlog.NewTracer(func(p logging.Perspective, connectionID []byte) io.WriteCloser {
 			fname := fmt.Sprintf("/tmp/%s-%x-quic-listener-%d.log", time.Now().Format("2006-01-02-15-04"), connectionID, p)
 			log.Println("quic tracer file opened as", fname)
 			f, err := os.Create(fname)
@@ -134,7 +136,8 @@ func NewQUICListener(address string, tp *network.TransportProperties) (*QUICList
 				panic(err)
 			}
 			return f
-		}),
+		}),*/
+		Tracer: stats.NewTracer(),
 	})
 	if err != nil {
 		return nil, err
@@ -156,5 +159,6 @@ func (l *QUICListener) Listen() (network.Connection, error) {
 }
 
 func (l *QUICListener) Stop() error {
+	log.Println("Stop called")
 	return nil
 }

@@ -76,10 +76,12 @@ end
 -- not directly referenced from go
 paths = {}
 ranking = {}
-times = {}
-switchover = 10
+--times = {}
+switchtime = 15
 oldpaths = {}
+steps = 2
 stepsize = 1
+start = 0
 
 print("Hello SelectionServer")
 
@@ -104,7 +106,7 @@ end
 function setpaths(addr, ps)
    addr = tostring(addr)
    print("setpath", addr)
-   times[addr] = os.time()
+   --times[addr] = os.time()
 
    --tprint(gopath2luapath(ps, pathstructure))
    for index in ps() do
@@ -116,7 +118,7 @@ function setpaths(addr, ps)
       --tprint(paths[path])
       table.insert(ranking, path)
    end
-   stepsize = math.ceil(#ranking / switchover)
+   stepsize = math.ceil(#ranking / steps)
    print("stepsize", stepsize, "paths", #ranking)
    --print(string.format("lua output: setpaths called with %s and %d paths", addr, #ranking))
    rankpaths()
@@ -125,13 +127,21 @@ end
 -- gets called for every packet
 -- implementation needs to be efficient
 function selectpath(addr)
+   if start == 0 then
+      start = os.time()
+   end
    addr = tostring(addr)
    if #ranking > 0 then
-      -- switch to new path every 10 seconds
-      t = (os.time() - times[addr])
-      path = ranking[math.floor(t / switchover) * stepsize + 1]
+      local diff = os.time() - start
+      local index = math.floor(diff / switchtime) * stepsize
+      if index == 0 then
+         index = 1
+      end
+      if index < #ranking then
+         path = ranking[index]
+      end
       if path ~= oldpaths[addr] then
-         print("lua output: selecting new path with ", paths[path].Fingerprint, "at time", t)
+         print("lua output: selecting new path", paths[path].Fingerprint, "with index", index, "at time", diff)
          oldpaths[addr] = path
       end
       return path
