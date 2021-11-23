@@ -203,14 +203,19 @@ func (s *LuaSelector) SetPaths(raddr pan.UDPAddr, paths []*pan.Path) {
 	//call the "setpaths" function in the Lua script
 	//with two arguments
 	//and don't expect a return value
-	s.L.CallByParam(
+	err := s.L.CallByParam(
 		lua.P{
-			Fn:   s.mod.RawGetString("setpaths"),
-			NRet: 0,
+			Protect: true,
+			Fn:      s.mod.RawGetString("setpaths"),
+			NRet:    0,
 		},
 		lua.LString(raddr.String()),
 		lua_table_slice_to_table(lpaths),
 	)
+	if err != nil {
+		s.l.Fatal("SetPaths", err)
+	}
+
 }
 
 func (s *LuaSelector) Path(raddr pan.UDPAddr) *pan.Path {
@@ -220,9 +225,13 @@ func (s *LuaSelector) Path(raddr pan.UDPAddr) *pan.Path {
 
 	//call the "selectpath" function from the Lua script
 	//expect 1 return value
-	s.L.CallByParam(lua.P{
-		Fn:   s.mod.RawGetString("selectpath"),
-		NRet: 1}, lua.LString(raddr.String()))
+	err := s.L.CallByParam(lua.P{
+		Protect: true,
+		Fn:      s.mod.RawGetString("selectpath"),
+		NRet:    1}, lua.LString(raddr.String()))
+	if err != nil {
+		s.l.Fatal("Path", err)
+	}
 	lt := s.L.ToTable(-1)
 	//pop element from the stack
 	s.L.Pop(1)
@@ -230,23 +239,24 @@ func (s *LuaSelector) Path(raddr pan.UDPAddr) *pan.Path {
 }
 
 func (s *LuaSelector) OnPathDown(raddr pan.UDPAddr, fp pan.PathFingerprint, pi pan.PathInterface) {
-	s.l.Println("OnPathDown()")
+	//s.l.Println("OnPathDown()")
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	//call the "onpathdown" function in the Lua script
-	//with two arguments
-	//and don't expect a return value
 	err := s.L.CallByParam(
 		lua.P{
-			Fn:   s.mod.RawGetString("onpathdown"),
-			NRet: 0,
+			Fn:      s.mod.RawGetString("onpathdown"),
+			NRet:    0,
+			Protect: true,
 		},
 		lua.LString(raddr.String()),
 		lua.LString(fp),
 		new_lua_path_interface(pi),
 	)
-
 	s.l.Printf("OnPathDown called with fp %v and pi %v: %s", fp, pi, err)
+	if err != nil {
+		s.l.Fatal(err)
+	}
+
 }
 
 func (s *LuaSelector) Close(raddr pan.UDPAddr) error {
@@ -256,8 +266,11 @@ func (s *LuaSelector) Close(raddr pan.UDPAddr) error {
 	//call the "selectpath" function from the Lua script
 	//expect 1 return value
 	err := s.L.CallByParam(
-		lua.P{Fn: s.mod.RawGetString("close"),
-			NRet: 1},
+		lua.P{
+			Protect: true,
+			Fn:      s.mod.RawGetString("close"),
+			NRet:    1,
+		},
 		lua.LString(raddr.String()))
 
 	log.Println("Close called on LuaSelector:", err)
