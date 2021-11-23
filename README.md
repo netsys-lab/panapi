@@ -1,4 +1,5 @@
 # PANAPI -- Work In Progress
+[![Go](https://github.com/netsys-lab/panapi/actions/workflows/go.yml/badge.svg)](https://github.com/netsys-lab/panapi/actions/workflows/go.yml)
 
 ## `cmd/daemon` - The PANAPI Daemon
 
