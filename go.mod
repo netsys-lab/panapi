@@ -68,6 +68,7 @@ require (
 )
 
 replace (
-	github.com/netsec-ethz/scion-apps => github.com/netsys-lab/scion-apps v0.1.1-0.20211104195016-a09c318e9786
+	github.com/netsec-ethz/scion-apps => github.com/netsys-lab/scion-apps v0.1.1-0.20211123104651-c26619ae9982
+	//github.com/netsec-ethz/scion-apps => github.com/netsys-lab/scion-apps v0.1.1-0.20211104195016-a09c318e9786
 	github.com/scionproto/scion => github.com/netsec-ethz/scion v0.0.0-20211005155700-e5719e3cd5ed
 )

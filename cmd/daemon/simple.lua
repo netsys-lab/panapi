@@ -4,8 +4,8 @@ paths = {}
 print("Hello Simple SelectionServer")
 
 -- gets called when a set of paths to addr is known
-function panapi.setpaths(addr, ps)
-   panapi.log("setpath", addr)
+function panapi.initialize(laddr, raddr, ps)
+   panapi.log("initialize")
    paths = ps
 end
 
@@ -17,8 +17,13 @@ function panapi.selectpath(addr)
 end
 
 -- gets called whenever a path disappears(?)
-function panapi.onpathdown(addr, fp, pi)
-   panapi.log(string.format("lua output: onpathdown called with fp %s and pi %s", fp, pi))
+function panapi.pathdown(addr, fp, pi)
+   panapi.log("pathdown called with", fp, pi)
+end
+
+function panapi.refresh(addr, ps)
+   panapi.log("refresh", addr, ps)
+   paths = ps
 end
 
 function panapi.close(addr)

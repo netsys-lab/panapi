@@ -152,9 +152,10 @@ func NewLuaSelector(script string) (rpc.ServerSelector, error) {
 	L := lua.NewState()
 	mod := map[string]lua.LGFunction{}
 	for _, fn := range []string{
-		"setpaths",
+		"initialize",
 		"selectpath",
-		"onpathdown",
+		"pathdown",
+		"refresh",
 		"close",
 	} {
 		s := fmt.Sprintf("function %s not implemented in script", fn)
@@ -190,15 +191,15 @@ func NewLuaSelector(script string) (rpc.ServerSelector, error) {
 	}
 }
 
-func (s *LuaSelector) SetPaths(raddr pan.UDPAddr, paths []*pan.Path) {
-	s.l.Println("SetPaths()")
+func (s *LuaSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) {
+	s.l.Printf("Initialize(%s,%s,[%d]pan.Path)", local, remote, len(paths))
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	//assume that setpaths is called with all the currently valid options
 	//meaning that anything we already know can be flushed
-	s.state.clear_addr(raddr)
-	lpaths := s.state.set_paths(raddr, paths)
+	s.state.clear_addr(remote)
+	lpaths := s.state.set_paths(remote, paths)
 
 	//call the "setpaths" function in the Lua script
 	//with two arguments
@@ -206,14 +207,15 @@ func (s *LuaSelector) SetPaths(raddr pan.UDPAddr, paths []*pan.Path) {
 	err := s.L.CallByParam(
 		lua.P{
 			Protect: true,
-			Fn:      s.mod.RawGetString("setpaths"),
+			Fn:      s.mod.RawGetString("initialize"),
 			NRet:    0,
 		},
-		lua.LString(raddr.String()),
+		lua.LString(local.String()),
+		lua.LString(remote.String()),
 		lua_table_slice_to_table(lpaths),
 	)
 	if err != nil {
-		s.l.Fatal("SetPaths", err)
+		s.l.Fatal("Initialize", err)
 	}
 
 }
@@ -238,13 +240,13 @@ func (s *LuaSelector) Path(raddr pan.UDPAddr) *pan.Path {
 	return s.state.get_pan_path(lt)
 }
 
-func (s *LuaSelector) OnPathDown(raddr pan.UDPAddr, fp pan.PathFingerprint, pi pan.PathInterface) {
-	//s.l.Println("OnPathDown()")
+func (s *LuaSelector) PathDown(raddr pan.UDPAddr, fp pan.PathFingerprint, pi pan.PathInterface) {
+	//s.l.Println("PathDown()")
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	err := s.L.CallByParam(
 		lua.P{
-			Fn:      s.mod.RawGetString("onpathdown"),
+			Fn:      s.mod.RawGetString("pathdown"),
 			NRet:    0,
 			Protect: true,
 		},
@@ -252,11 +254,38 @@ func (s *LuaSelector) OnPathDown(raddr pan.UDPAddr, fp pan.PathFingerprint, pi p
 		lua.LString(fp),
 		new_lua_path_interface(pi),
 	)
-	s.l.Printf("OnPathDown called with fp %v and pi %v: %s", fp, pi, err)
+	s.l.Printf("PathDown called with fp %v and pi %v: %s", fp, pi, err)
 	if err != nil {
 		s.l.Fatal(err)
 	}
 
+}
+
+func (s *LuaSelector) Refresh(remote pan.UDPAddr, paths []*pan.Path) {
+	s.l.Println("Refresh()")
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	//assume that setpaths is called with all the currently valid options
+	//meaning that anything we already know can be flushed
+	s.state.clear_addr(remote)
+	lpaths := s.state.set_paths(remote, paths)
+
+	//call the "setpaths" function in the Lua script
+	//with two arguments
+	//and don't expect a return value
+	err := s.L.CallByParam(
+		lua.P{
+			Protect: true,
+			Fn:      s.mod.RawGetString("refresh"),
+			NRet:    0,
+		},
+		lua.LString(remote.String()),
+		lua_table_slice_to_table(lpaths),
+	)
+	if err != nil {
+		s.l.Fatal("refresh", err)
+	}
 }
 
 func (s *LuaSelector) Close(raddr pan.UDPAddr) error {
