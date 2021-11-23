@@ -5,22 +5,25 @@ PANAPI is an early [research](https://netsys.ovgu.de) implementation of a next-g
 
 ## `import "panapi"` - The PANAPI Library
 
-* [ ] Add code example here
+* [x] Simple working code example, see [examples/concurrent/README.md](examples/concurrent/README.md)
+* [ ] Add more code examples
 
 ## `cmd/daemon` - The PANAPI Daemon
 
-* [ ] Provide further details here
+* [x] applications selecting SCION as transport benefit from daemon running in the backend
+* [x] Graceful fallback to default behavior when daemon not running
+* [ ] Create dedicated daemon README
+* [x] Lua scripting examples 
+  * [x] [cmd/daemon/simple.lua](cmd/daemon/simple.lua)
 
-* SCION-enabled applications benefit from running daemon
-* Graceful fallback to default behavior when daemon not running
 
 ## Protocol support
 
 - [x] TCP/IP support
 - [x] QUIC/IP support
-- [ ] UDP/IP support _currently broken_
+- [ ] UDP/IP support (_currently broken_)
 - [x] QUIC/SCION support
-- [ ] UDP/SCION support _currently broken_
+- [ ] UDP/SCION support (_currently broken_)
 
 ## Features
 
@@ -28,7 +31,7 @@ PANAPI is an early [research](https://netsys.ovgu.de) implementation of a next-g
 
 - [x] Scriptable path selector, implementing `pan.Selector`
   - [x] working Lua Data model
-  - [x] working path ranking
+  - [ ] working path ranking (_currently broken, script needs to be ported to new API_)
 - [x] Central path selection Daemon
 
 ### Path quality
