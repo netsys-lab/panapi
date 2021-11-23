@@ -22,7 +22,7 @@ func newLuaPath(path *pan.Path) *lua.LTable {
 
 		if path.Metadata != nil {
 			meta := lua.LTable{}
-			meta.RawSetString("MTU", lua.LString(path.Metadata.MTU))
+			meta.RawSetString("MTU", lua.LNumber(path.Metadata.MTU))
 
 			ifaces := lua.LTable{}
 			for _, i := range path.Metadata.Interfaces {
