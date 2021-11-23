@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	//"runtime/pprof"
+
 	"github.com/fatih/color"
 	"github.com/netsys-lab/panapi"
 	"github.com/netsys-lab/panapi/network"
@@ -22,6 +24,7 @@ type SpateClientSpawner struct {
 	interactive    bool
 	bandwidth      int64
 	parallel       int
+	script         string
 }
 
 // e.g. NewSpateClientSpawner("16-ffaa:0:1001,[172.31.0.23]:1337")
@@ -71,6 +74,11 @@ func (s SpateClientSpawner) Interactive(interactive bool) SpateClientSpawner {
 
 func (s SpateClientSpawner) Bandwidth(bandwidth int64) SpateClientSpawner {
 	s.bandwidth = bandwidth
+	return s
+}
+
+func (s SpateClientSpawner) Script(script string) SpateClientSpawner {
+	s.script = script
 	return s
 }
 
@@ -130,6 +138,17 @@ func (s SpateClientSpawner) Spawn() error {
 			paths = paths[:1]
 		}
 	}*/
+	/*f, err := os.Create("cpuprofile")
+	if err != nil {
+		Error("could not create cpuprofile:", err)
+		panic(err)
+	}
+	defer f.Close()
+	if err := pprof.StartCPUProfile(f); err != nil {
+		Error("could not start CPU profile:", err)
+		panic(err)
+	}
+	defer pprof.StopCPUProfile()*/
 
 	paths := []int{1}
 	Info("Choosing the following paths: %v", paths)
@@ -139,7 +158,13 @@ func (s SpateClientSpawner) Spawn() error {
 	rs.WithTransport(s.transport)
 	rs.WithAddress(s.server_address)
 
-	preconn, err := panapi.NewPreconnection(rs)
+	tps := network.NewTransportProperties()
+	if s.script != "" {
+		Info("Attempting to load Lua path-selection script", s.script)
+		tps.Set("lua-script", s.script)
+	}
+
+	preconn, err := panapi.NewPreconnection(rs, tps)
 	if err != nil {
 		return err
 	}

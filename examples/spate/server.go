@@ -134,7 +134,7 @@ func (s SpateServerSpawner) Spawn() error {
 	ls.WithTransport(s.transport)
 	ls.WithAddress(s.addr)
 
-	preconn, err := panapi.NewPreconnection(ls)
+	preconn, err := panapi.NewPreconnection(ls, nil)
 	if err != nil {
 		Error("Assembling PreConnection failed: %s", err)
 		return err

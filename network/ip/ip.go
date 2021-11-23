@@ -160,7 +160,9 @@ func (l *QUICListener) Stop() error {
 	return nil
 }
 
-type ip struct{}
+type ip struct {
+	tp *network.TransportProperties
+}
 
 func (ip *ip) NewListener(e *network.Endpoint) (network.Listener, error) {
 	switch e.Transport {
@@ -188,8 +190,8 @@ func (ip *ip) NewDialer(e *network.Endpoint) (network.Dialer, error) {
 	}
 }
 
-func Network() network.Network {
-	return &ip{}
+func Network(tp *network.TransportProperties) network.Network {
+	return &ip{tp}
 }
 
 func generateTLSConfig() *tls.Config {
