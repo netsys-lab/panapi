@@ -1,5 +1,10 @@
 # PANAPI -- Work In Progress
 
+## `cmd/daemon` - The PANAPI Daemon
+
+* SCION-enabled applications benefit from running daemon
+* Graceful fallback to default behavior when daemon not running
+
 ## Protocol support
 
 - [x] TCP/IP support
@@ -15,7 +20,7 @@
 - [x] Scriptable path selector, implementing `pan.Selector`
   - [x] working Lua Data model
   - [x] working path ranking
-- [ ] Central path selection Daemon
+- [x] Central path selection Daemon
 
 ### Path quality
 

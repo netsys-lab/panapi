@@ -1,6 +1,8 @@
 package scion
 
 import (
+	"os"
+
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 	"github.com/netsys-lab/panapi/rpc"
 	"github.com/yuin/gopher-lua"
@@ -17,15 +19,21 @@ type LuaSelector struct {
 
 //func NewLuaSelector(script string) (*LuaSelector, error) {
 func NewLuaSelector(script string) (rpc.ServerSelector, error) {
-	//initialize Lua VM
-	L := lua.NewState()
 	//load script
-	if err := L.DoFile(script); err != nil {
+	file, err := os.Open(script)
+	if err != nil {
 		return nil, err
 	}
-	log.Printf("loaded selector from file %s", script)
-	selector := LuaSelector{L: L}
-	return &selector, nil
+	//initialize Lua VM
+	L := lua.NewState()
+	if fn, err := L.Load(file, script); err != nil {
+		return nil, err
+	} else {
+		log.Printf("loaded selector from file %s", script)
+		L.Push(fn)
+		err = L.PCall(0, lua.MultRet, nil)
+		return &LuaSelector{L: L}, err
+	}
 }
 
 func (s *LuaSelector) Path(raddr pan.UDPAddr) *pan.Path {

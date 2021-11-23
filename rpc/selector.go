@@ -2,6 +2,7 @@ package rpc
 
 import (
 	//"fmt"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -12,10 +13,13 @@ import (
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 )
 
-var DefaultDaemonAddress = &net.UnixAddr{
-	Name: "/tmp/panapid.sock",
-	Net:  "unix",
-}
+var (
+	DefaultDaemonAddress = &net.UnixAddr{
+		Name: "/tmp/panapid.sock",
+		Net:  "unix",
+	}
+	ErrDeref = errors.New("Can not dereference Nil value")
+)
 
 type Path struct {
 	Source      pan.IA
@@ -118,6 +122,9 @@ func (s *SelectorServer) SetPaths(args, resp *Msg) error {
 		paths[i] = p.PanPath()
 		//log.Printf("%s", paths[i].Source)
 	}
+	if args.Remote == nil {
+		return ErrDeref
+	}
 	s.selector.SetPaths(*args.Remote, paths)
 	msg := "SetPaths done"
 	fmt.Println(msg)
@@ -126,7 +133,10 @@ func (s *SelectorServer) SetPaths(args, resp *Msg) error {
 
 func (s *SelectorServer) Path(args, resp *Msg) error {
 	//log.Println("Path invoked")
-	log.Printf("%+v", args)
+	//log.Printf("%+v", args)
+	if args.Remote == nil {
+		return ErrDeref
+	}
 	p := s.selector.Path(*args.Remote)
 	//fmt.Printf("%+v", resp)
 	resp.Fingerprint = &p.Fingerprint
@@ -136,12 +146,18 @@ func (s *SelectorServer) Path(args, resp *Msg) error {
 
 func (s *SelectorServer) OnPathDown(args, resp *Msg) error {
 	log.Println("OnPathDown called")
+	if args.Remote == nil || args.Fingerprint == nil || args.PathInterface == nil {
+		return ErrDeref
+	}
 	s.selector.OnPathDown(*args.Remote, *args.Fingerprint, *args.PathInterface)
 	return nil
 }
 
 func (s *SelectorServer) Close(args, resp *Msg) error {
 	log.Println("Close called")
+	if args.Remote == nil {
+		return ErrDeref
+	}
 	return s.selector.Close(*args.Remote)
 }
 
