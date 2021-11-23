@@ -1,6 +1,7 @@
 package scion
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
@@ -91,6 +92,7 @@ func lua_table_slice_to_table(s []*lua.LTable) *lua.LTable {
 	return &res
 }
 
+// help to translate lua to pan pointers back and forth
 type state struct {
 	lpaths map[string]map[string]*lua.LTable
 	ppaths map[*lua.LTable]*pan.Path
@@ -131,6 +133,8 @@ type LuaSelector struct {
 	mutex sync.Mutex
 	L     *lua.LState
 	state state
+	l     *log.Logger
+	mod   *lua.LTable
 }
 
 //func NewLuaSelector(script string) (*LuaSelector, error) {
@@ -140,34 +144,68 @@ func NewLuaSelector(script string) (rpc.ServerSelector, error) {
 	if err != nil {
 		return nil, err
 	}
+	l := log.Default() //.New(os.Stderr, "lua", log.Ltime|log.Lshortfile)
+	l.SetFlags(log.Ltime)
+	l.SetPrefix("lua ")
+
 	//initialize Lua VM
 	L := lua.NewState()
+	mod := map[string]lua.LGFunction{}
+	for _, fn := range []string{
+		"setpaths",
+		"selectpath",
+		"onpathdown",
+		"close",
+	} {
+		s := fmt.Sprintf("function %s not implemented in script", fn)
+		mod[fn] = func(L *lua.LState) int {
+			l.Panic(s)
+			return 0
+		}
+	}
+
+	mod["log"] = func(L *lua.LState) int {
+		s := ""
+		for i := 1; i <= L.GetTop(); i++ {
+			s += L.Get(i).String() + " "
+		}
+		l.Println(s)
+		return 0
+	}
+
+	panapi := L.RegisterModule("panapi", mod).(*lua.LTable)
+
 	if fn, err := L.Load(file, script); err != nil {
 		return nil, err
 	} else {
-		log.Printf("loaded selector from file %s", script)
+		l.Printf("loaded selector from file %s", script)
 		L.Push(fn)
 		err = L.PCall(0, lua.MultRet, nil)
 		return &LuaSelector{
 			L:     L,
 			state: new_state(),
+			l:     l,
+			mod:   panapi,
 		}, err
 	}
 }
 
 func (s *LuaSelector) SetPaths(raddr pan.UDPAddr, paths []*pan.Path) {
-	log.Println("SetPaths()")
+	s.l.Println("SetPaths()")
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
+
+	//assume that setpaths is called with all the currently valid options
+	//meaning that anything we already know can be flushed
+	s.state.clear_addr(raddr)
+	lpaths := s.state.set_paths(raddr, paths)
 
 	//call the "setpaths" function in the Lua script
 	//with two arguments
 	//and don't expect a return value
-	s.state.clear_addr(raddr)
-	lpaths := s.state.set_paths(raddr, paths)
 	s.L.CallByParam(
 		lua.P{
-			Fn:   s.L.GetGlobal("setpaths"),
+			Fn:   s.mod.RawGetString("setpaths"),
 			NRet: 0,
 		},
 		lua.LString(raddr.String()),
@@ -183,7 +221,7 @@ func (s *LuaSelector) Path(raddr pan.UDPAddr) *pan.Path {
 	//call the "selectpath" function from the Lua script
 	//expect 1 return value
 	s.L.CallByParam(lua.P{
-		Fn:   s.L.GetGlobal("selectpath"),
+		Fn:   s.mod.RawGetString("selectpath"),
 		NRet: 1}, lua.LString(raddr.String()))
 	lt := s.L.ToTable(-1)
 	//pop element from the stack
@@ -192,7 +230,7 @@ func (s *LuaSelector) Path(raddr pan.UDPAddr) *pan.Path {
 }
 
 func (s *LuaSelector) OnPathDown(raddr pan.UDPAddr, fp pan.PathFingerprint, pi pan.PathInterface) {
-	log.Println("OnPathDown()")
+	s.l.Println("OnPathDown()")
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	//call the "onpathdown" function in the Lua script
@@ -200,7 +238,7 @@ func (s *LuaSelector) OnPathDown(raddr pan.UDPAddr, fp pan.PathFingerprint, pi p
 	//and don't expect a return value
 	err := s.L.CallByParam(
 		lua.P{
-			Fn:   s.L.GetGlobal("onpathdown"),
+			Fn:   s.mod.RawGetString("onpathdown"),
 			NRet: 0,
 		},
 		lua.LString(raddr.String()),
@@ -208,7 +246,7 @@ func (s *LuaSelector) OnPathDown(raddr pan.UDPAddr, fp pan.PathFingerprint, pi p
 		new_lua_path_interface(pi),
 	)
 
-	log.Printf("OnPathDown called with fp %v and pi %v: %s", fp, pi, err)
+	s.l.Printf("OnPathDown called with fp %v and pi %v: %s", fp, pi, err)
 }
 
 func (s *LuaSelector) Close(raddr pan.UDPAddr) error {
@@ -218,7 +256,7 @@ func (s *LuaSelector) Close(raddr pan.UDPAddr) error {
 	//call the "selectpath" function from the Lua script
 	//expect 1 return value
 	err := s.L.CallByParam(
-		lua.P{Fn: s.L.GetGlobal("close"),
+		lua.P{Fn: s.mod.RawGetString("close"),
 			NRet: 1},
 		lua.LString(raddr.String()))
 
