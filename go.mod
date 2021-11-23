@@ -10,7 +10,6 @@ require (
 	github.com/scionproto/scion v0.6.1-0.20210929154253-764d6e2afe47
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/yuin/gopher-lua v0.0.0-20210529063254-f4c35e4016d9
-	layeh.com/gopher-luar v1.0.10
 )
 
 require (
