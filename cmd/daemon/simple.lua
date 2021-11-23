@@ -6,7 +6,6 @@ print("Hello Simple SelectionServer")
 -- gets called when a set of paths to addr is known
 function panapi.setpaths(addr, ps)
    panapi.log("setpath", addr)
-   tprint(ps)
    paths = ps
 end
 
