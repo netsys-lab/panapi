@@ -1,7 +1,7 @@
 # PANAPI -- Work In Progress
 [![Go](https://github.com/netsys-lab/panapi/actions/workflows/go.yml/badge.svg)](https://github.com/netsys-lab/panapi/actions/workflows/go.yml)
 
-PANAPI is an early [research](https://netsys-lab.ovgu.de) implementation of a next-generation networking [API to the transport layer](https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html). The latter is currently under development in the IETF [TAPS working group](https://datatracker.ietf.org/wg/taps/about/). PANAPI is an [EU-funded](https://pointer.ngi.eu/) open-source project, that [adds support](https://dl.acm.org/doi/10.1145/3472727.3472808) for the [SCION network architecture](https://scion-architecture.net/) to a general purpose TAPS-like networking API.
+PANAPI is an early [research](https://netsys.ovgu.de) implementation of a next-generation networking [API to the transport layer](https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html). The latter is currently under development in the IETF [TAPS working group](https://datatracker.ietf.org/wg/taps/about/). PANAPI is an [EU-funded](https://pointer.ngi.eu/) open-source project, that [adds support](https://dl.acm.org/doi/10.1145/3472727.3472808) for the [SCION network architecture](https://scion-architecture.net/) to a general purpose TAPS-like networking API.
 
 ## `import "panapi"` - The PANAPI Library
 
