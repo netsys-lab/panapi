@@ -48,6 +48,7 @@ PANAPI is an early [research](https://dl.acm.org/doi/10.1145/3472727.3472808) im
 ### Other
 - [ ] Full test coverage
 - [ ] Code Documentation
+- [ ] Move scripting selector to `/pkg` such that it could be used without the rest of PANAPI
 
 ## Ported Applications
 - [x] `spate` traffic generator
@@ -56,3 +57,7 @@ PANAPI is an early [research](https://dl.acm.org/doi/10.1145/3472727.3472808) im
   - [ ] server
   - [ ] client
 
+## Affiliations
+
+[![OVGU](assets/ovgu.png)](https://netsys.ovgu.de)
+[![NGI Pointer](assets/NGI-Pointer-logo.png)](https://pointer.ngi.eu)
