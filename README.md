@@ -60,4 +60,7 @@ PANAPI is an early [research](https://dl.acm.org/doi/10.1145/3472727.3472808) im
 ## Affiliations
 
 [![OVGU](assets/ovgu-small.png)](https://netsys.ovgu.de)
+
 [![NGI Pointer](assets/NGI-Pointer-logo-small.png)](https://pointer.ngi.eu)
+
+[![SCION](assets/scion-small.png)](https://scion-architecture.net)
