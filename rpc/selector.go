@@ -2,6 +2,7 @@ package rpc
 
 import (
 	//"fmt"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -12,10 +13,13 @@ import (
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 )
 
-var DefaultDaemonAddress = &net.UnixAddr{
-	Name: "/tmp/panapid.sock",
-	Net:  "unix",
-}
+var (
+	DefaultDaemonAddress = &net.UnixAddr{
+		Name: "/tmp/panapid.sock",
+		Net:  "unix",
+	}
+	ErrDeref = errors.New("Can not dereference Nil value")
+)
 
 type Path struct {
 	Source      pan.IA
@@ -50,9 +54,10 @@ func NewPathFrom(p *pan.Path) *Path {
 }
 
 type ServerSelector interface {
+	Initialize(pan.UDPAddr, pan.UDPAddr, []*pan.Path)
 	Path(pan.UDPAddr) *pan.Path
-	SetPaths(pan.UDPAddr, []*pan.Path)
-	OnPathDown(pan.UDPAddr, pan.PathFingerprint, pan.PathInterface)
+	PathDown(pan.UDPAddr, pan.PathFingerprint, pan.PathInterface)
+	Refresh(pan.UDPAddr, []*pan.Path)
 	Close(pan.UDPAddr) error
 }
 
@@ -78,12 +83,16 @@ func (s serverSelector) Path(raddr pan.UDPAddr) *pan.Path {
 	return s.getSelector(raddr).Path()
 }
 
-func (s serverSelector) SetPaths(raddr pan.UDPAddr, paths []*pan.Path) {
-	s.getSelector(raddr).SetPaths(raddr, paths)
+func (s serverSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) {
+	s.getSelector(remote).Initialize(local, remote, paths)
 }
 
-func (s serverSelector) OnPathDown(raddr pan.UDPAddr, fp pan.PathFingerprint, pi pan.PathInterface) {
-	s.getSelector(raddr).OnPathDown(fp, pi)
+func (s serverSelector) PathDown(raddr pan.UDPAddr, fp pan.PathFingerprint, pi pan.PathInterface) {
+	s.getSelector(raddr).PathDown(fp, pi)
+}
+
+func (s serverSelector) Refresh(remote pan.UDPAddr, paths []*pan.Path) {
+	s.getSelector(remote).Refresh(paths)
 }
 
 func (s serverSelector) Close(raddr pan.UDPAddr) error {
@@ -93,6 +102,7 @@ func (s serverSelector) Close(raddr pan.UDPAddr) error {
 }
 
 type Msg struct {
+	Local         *pan.UDPAddr
 	Remote        *pan.UDPAddr
 	Fingerprint   *pan.PathFingerprint
 	PathInterface *pan.PathInterface
@@ -111,96 +121,119 @@ func NewSelectorServer(selector ServerSelector) (*rpc.Server, error) {
 	return rpc.DefaultServer, nil
 }
 
-func (s *SelectorServer) SetPaths(args, resp *Msg) error {
-	fmt.Println("SetPaths invoked")
+func (s *SelectorServer) Initialize(args, resp *Msg) error {
+	fmt.Println("Initialize invoked")
 	paths := make([]*pan.Path, len(args.Paths))
 	for i, p := range args.Paths {
 		paths[i] = p.PanPath()
 		//log.Printf("%s", paths[i].Source)
 	}
-	s.selector.SetPaths(*args.Remote, paths)
-	msg := "SetPaths done"
+	if args.Local == nil || args.Remote == nil {
+		return ErrDeref
+	}
+	s.selector.Initialize(*args.Local, *args.Remote, paths)
+	msg := "Initialize done"
 	fmt.Println(msg)
 	return nil
 }
 
 func (s *SelectorServer) Path(args, resp *Msg) error {
-	//log.Println("Path invoked")
-	//log.Printf("%+v", args)
+	if args.Remote == nil {
+		return ErrDeref
+	}
 	p := s.selector.Path(*args.Remote)
-	//fmt.Printf("%+v", resp)
-	resp.Fingerprint = &p.Fingerprint
-	//log.Printf("Path done")
+	if p != nil {
+		resp.Fingerprint = &p.Fingerprint
+	}
 	return nil
 }
 
-func (s *SelectorServer) OnPathDown(args, resp *Msg) error {
-	log.Println("OnPathDown called")
-	s.selector.OnPathDown(*args.Remote, *args.Fingerprint, *args.PathInterface)
+func (s *SelectorServer) PathDown(args, resp *Msg) error {
+	log.Println("PathDown called")
+	if args.Remote == nil || args.Fingerprint == nil || args.PathInterface == nil {
+		return ErrDeref
+	}
+	s.selector.PathDown(*args.Remote, *args.Fingerprint, *args.PathInterface)
+	return nil
+}
+
+func (s *SelectorServer) Refresh(args, resp *Msg) error {
+	fmt.Println("Refresh invoked")
+	paths := make([]*pan.Path, len(args.Paths))
+	for i, p := range args.Paths {
+		paths[i] = p.PanPath()
+		//log.Printf("%s", paths[i].Source)
+	}
+	if args.Remote == nil {
+		return ErrDeref
+	}
+	s.selector.Refresh(*args.Remote, paths)
+	msg := "Refresh done"
+	fmt.Println(msg)
 	return nil
 }
 
 func (s *SelectorServer) Close(args, resp *Msg) error {
 	log.Println("Close called")
+	if args.Remote == nil {
+		return ErrDeref
+	}
 	return s.selector.Close(*args.Remote)
 }
 
 type SelectorClient struct {
 	client *rpc.Client
 	paths  map[pan.PathFingerprint]*pan.Path
-	raddr  *pan.UDPAddr
+	local  *pan.UDPAddr
+	remote *pan.UDPAddr
 }
 
 func NewSelectorClient(conn io.ReadWriteCloser) *SelectorClient {
 	client := rpc.NewClient(conn)
 	log.Printf("RPC connection etablished")
-	return &SelectorClient{client, map[pan.PathFingerprint]*pan.Path{}, nil}
+	return &SelectorClient{client, map[pan.PathFingerprint]*pan.Path{}, nil, nil}
 }
 
-func (s *SelectorClient) SetPaths(remote pan.UDPAddr, paths []*pan.Path) {
-	log.Println("SetPaths called")
-	if s.raddr != nil {
-		if s.raddr.Equal(remote) {
-			log.Fatalf("%s != %s", *s.raddr, remote)
-		} else {
-			log.Println("Setpaths update apparently")
-		}
-	} else {
-		s.raddr = &remote
-	}
+func (s *SelectorClient) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) {
+	log.Println("Initialize called")
+	s.remote = &remote
+	s.local = &local
 	ps := make([]*Path, len(paths))
 	for i, p := range paths {
 		s.paths[p.Fingerprint] = p
 		ps[i] = NewPathFrom(p)
 	}
-	err := s.client.Call("SelectorServer.SetPaths", &Msg{
-		Remote: s.raddr,
+	err := s.client.Call("SelectorServer.Initialize", &Msg{
+		Local:  s.local,
+		Remote: s.remote,
 		Paths:  ps,
 	}, &Msg{})
 	if err != nil {
 		log.Fatalln(err)
 	}
-	log.Printf("SetPaths returned")
+	log.Printf("Initialize returned")
 }
 
 func (s *SelectorClient) Path() *pan.Path {
 	//log.Println("Path called")
 	msg := Msg{}
 	err := s.client.Call("SelectorServer.Path", &Msg{
-		Remote: s.raddr,
+		Remote: s.remote,
 	}, &msg)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	//log.Printf("Returning %+v", s.paths[*msg.Fingerprint])
-	return s.paths[*msg.Fingerprint]
-	//return s.references[0] //path
+	if msg.Fingerprint != nil {
+		return s.paths[*msg.Fingerprint]
+	}
+	return nil
 }
-func (s *SelectorClient) OnPathDown(fp pan.PathFingerprint, pi pan.PathInterface) {
-	log.Println("OnPathDown called")
+
+func (s *SelectorClient) PathDown(fp pan.PathFingerprint, pi pan.PathInterface) {
+	log.Println("PathDown called")
 	s.paths[fp] = nil // remove from local table
-	err := s.client.Call("SelectorServer.OnPathDown", &Msg{
-		Remote:        s.raddr,
+	err := s.client.Call("SelectorServer.PathDown", &Msg{
+		Remote:        s.remote,
 		Fingerprint:   &fp,
 		PathInterface: &pi,
 	}, &Msg{})
@@ -209,9 +242,27 @@ func (s *SelectorClient) OnPathDown(fp pan.PathFingerprint, pi pan.PathInterface
 	}
 
 }
+
+func (s *SelectorClient) Refresh(paths []*pan.Path) {
+	log.Println("Refresh called")
+	ps := make([]*Path, len(paths))
+	for i, p := range paths {
+		s.paths[p.Fingerprint] = p
+		ps[i] = NewPathFrom(p)
+	}
+	err := s.client.Call("SelectorServer.Refresh", &Msg{
+		Remote: s.remote,
+		Paths:  ps,
+	}, &Msg{})
+	if err != nil {
+		log.Fatalln(err)
+	}
+	log.Printf("Refresh returned")
+}
+
 func (s *SelectorClient) Close() error {
 	log.Println("Close called")
-	err := s.client.Call("SelectorServer.Close", &Msg{Remote: s.raddr}, &Msg{})
+	err := s.client.Call("SelectorServer.Close", &Msg{Remote: s.remote}, &Msg{})
 	if err != nil {
 		log.Println(err)
 		log.Println(s.client.Close())

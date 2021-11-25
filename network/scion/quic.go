@@ -30,24 +30,18 @@ type QUICDialer struct {
 	tp       *network.TransportProperties
 }
 
-func getSelector(tp *network.TransportProperties) (selector pan.Selector, err error) {
+func getSelector(tp *network.TransportProperties) (selector pan.Selector) {
 	if tp != nil {
-		/*if script, ok := tp.Properties["lua-script"]; ok {
-			selector, err = NewLuaSelector(script)
-			if err != nil {
-				return
-			}
-		} else {*/
-		//log.Println("no selector script found in transport properties")
-		log.Println("using daemon selector")
-		var conn *net.UnixConn
-		conn, err = net.DialUnix("unix", nil, rpc.DefaultDaemonAddress)
+		conn, err := net.DialUnix("unix", nil, rpc.DefaultDaemonAddress)
 		if err != nil {
-			return
+			log.Printf("Could not connect to PANAPI Deamon: %s", err)
+			log.Println("Using default selector")
+			selector = &pan.DefaultSelector{}
+		} else {
+			log.Println("using daemon selector")
+			selector = rpc.NewSelectorClient(conn)
 		}
-		selector = rpc.NewSelectorClient(conn)
 		return
-		//		}
 	} else {
 		log.Println("no transport properties given")
 	}
@@ -55,17 +49,9 @@ func getSelector(tp *network.TransportProperties) (selector pan.Selector, err er
 }
 
 func NewQUICDialer(address string, tp *network.TransportProperties) (*QUICDialer, error) {
-	var (
-		selector pan.Selector
-		err      error
-		addr     pan.UDPAddr
-	)
-	selector, err = getSelector(tp)
-	if err != nil {
-		return nil, err
-	}
-	addr, err = pan.ResolveUDPAddr(address)
-	return &QUICDialer{addr, selector, tp}, err
+	selector := getSelector(tp)
+	addr, err := pan.ResolveUDPAddr(address)
+	return &QUICDialer{addr, selector}, err
 }
 
 func (d *QUICDialer) Dial() (network.Connection, error) {
@@ -74,20 +60,7 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"panapi-quic-test"},
 	}
-	//log.Printf("%+v", d.selector)
-	conn, err := pan.DialQUIC(context.Background(), nil, d.raddr, nil, d.selector, "", tlsConf, &quic.Config{
-		/*Tracer: qlog.NewTracer(func(p logging.Perspective, connectionID []byte) io.WriteCloser {
-			fname := fmt.Sprintf("/tmp/%s-%x-quic-dialer-%d.log", time.Now().Format("2006-01-02-15-04"), connectionID, p)
-			log.Println("quic tracer file opened as", fname)
-			f, err := os.Create(fname)
-			if err != nil {
-				panic(err)
-			}
-			return f
-		}),*/
-		Tracer: stats.NewTracer(d.raddr),
-	})
-
+	conn, err := pan.DialQUIC(context.Background(), nil, d.raddr, nil, d.selector, "", tlsConf, nil)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -105,15 +78,6 @@ type QUICListener struct {
 }
 
 func NewQUICListener(address string, tp *network.TransportProperties) (*QUICListener, error) {
-	/*var (
-		selector pan.Selector
-		err      error
-	)
-	selector, err = getSelector(tp)
-	if err != nil {
-		return nil, err
-	}*/
-
 	addr, err := pan.ResolveUDPAddr(address)
 	if err != nil {
 		return nil, err

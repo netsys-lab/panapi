@@ -1,10 +1,9 @@
 package debug
 
 import (
+	"github.com/netsec-ethz/scion-apps/pkg/pan"
 	"log"
 	"time"
-
-	"github.com/netsec-ethz/scion-apps/pkg/pan"
 )
 
 type DebugSelector struct {
@@ -15,27 +14,16 @@ type DebugSelector struct {
 func NewDebugSelector(delay time.Duration, selector pan.Selector) (pan.Selector, error) {
 	log.SetPrefix("Debug Selector")
 	if selector == nil {
-		selector = &pan.DefaultSelector{}
+		selector = pan.NewDefaultSelector()
 	}
 	return &DebugSelector{delay, selector}, nil
 }
 
-func (s *DebugSelector) SetPaths(remote pan.UDPAddr, paths []*pan.Path) {
-	log.Println("Enter SetPaths")
+func (s *DebugSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) {
+	log.Println("Enter Initialize")
 	time.Sleep(s.delay)
-	ps := make([]*pan.Path, len(paths))
-	for i, p := range paths {
-		ps[i] = &pan.Path{
-			Source:         p.Source,
-			Destination:    p.Destination,
-			ForwardingPath: p.ForwardingPath,
-			//Metadata:    p.Metadata.Copy(),
-			//Fingerprint: p.Fingerprint,
-			//Expiry:      p.Expiry,
-		}
-	}
-	s.s.SetPaths(remote, ps)
-	log.Println("Return SetPaths")
+	s.s.Initialize(local, remote, paths)
+	log.Println("Return Initialize")
 }
 
 func (s *DebugSelector) Path() *pan.Path {
@@ -46,12 +34,19 @@ func (s *DebugSelector) Path() *pan.Path {
 	return res
 }
 
-func (s *DebugSelector) OnPathDown(fp pan.PathFingerprint, pi pan.PathInterface) {
-	log.Println("Enter OnPathDown")
+func (s *DebugSelector) PathDown(fp pan.PathFingerprint, pi pan.PathInterface) {
+	log.Println("Enter PathDown")
 	time.Sleep(s.delay)
-	s.s.OnPathDown(fp, pi)
-	log.Println("Return OnPathDown")
+	s.s.PathDown(fp, pi)
+	log.Println("Return PathDown")
 
+}
+
+func (s *DebugSelector) Refresh(paths []*pan.Path) {
+	log.Println("Enter Refresh")
+	time.Sleep(s.delay)
+	s.s.Refresh(paths)
+	log.Println("Return Refresh")
 }
 
 func (s *DebugSelector) Close() error {
