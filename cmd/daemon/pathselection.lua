@@ -77,6 +77,6 @@ function panapi.close(raddr)
    paths[raddr] = nil
 end
 
-function panapi.periodic(second)
-
+function panapi.periodic(seconds)
+   --panapi.log("periodic", seconds)
 end

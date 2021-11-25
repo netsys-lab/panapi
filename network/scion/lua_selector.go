@@ -3,6 +3,7 @@ package scion
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 	"github.com/netsys-lab/panapi/rpc"
@@ -135,6 +136,7 @@ type LuaSelector struct {
 	state state
 	l     *log.Logger
 	mod   *lua.LTable
+	d     time.Duration
 }
 
 //func NewLuaSelector(script string) (*LuaSelector, error) {
@@ -157,7 +159,7 @@ func NewLuaSelector(script string) (rpc.ServerSelector, error) {
 		"pathdown",
 		"refresh",
 		"close",
-		//"periodic",
+		"periodic",
 	} {
 		s := fmt.Sprintf("function %s not implemented in script", fn)
 		mod[fn] = func(L *lua.LState) int {
@@ -184,19 +186,35 @@ func NewLuaSelector(script string) (rpc.ServerSelector, error) {
 		L.Push(fn)
 		err = L.PCall(0, lua.MultRet, nil)
 		if err != nil {
-			panic(err)
 			return nil, err
 		}
-		/*		go func(L *lua.LState) {
-				ticker := time.
-				for
-			}(L)*/
-		return &LuaSelector{
+		s := &LuaSelector{
 			L:     L,
 			state: new_state(),
 			l:     l,
 			mod:   panapi,
-		}, err
+			d:     time.Second,
+		}
+
+		go func(s *LuaSelector) {
+			old := time.Now()
+			for {
+				time.Sleep(s.d)
+				s.mutex.Lock()
+				seconds := time.Since(old).Seconds()
+				s.L.CallByParam(
+					lua.P{
+						Protect: true,
+						Fn:      s.mod.RawGetString("periodic"),
+						NRet:    0,
+					},
+					lua.LNumber(seconds),
+				)
+				old = time.Now()
+				s.mutex.Unlock()
+			}
+		}(s)
+		return s, err
 	}
 }
 
