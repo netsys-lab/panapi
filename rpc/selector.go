@@ -138,15 +138,13 @@ func (s *SelectorServer) Initialize(args, resp *Msg) error {
 }
 
 func (s *SelectorServer) Path(args, resp *Msg) error {
-	//log.Println("Path invoked")
-	//log.Printf("%+v", args)
 	if args.Remote == nil {
 		return ErrDeref
 	}
 	p := s.selector.Path(*args.Remote)
-	//fmt.Printf("%+v", resp)
-	resp.Fingerprint = &p.Fingerprint
-	//log.Printf("Path done")
+	if p != nil {
+		resp.Fingerprint = &p.Fingerprint
+	}
 	return nil
 }
 
@@ -225,10 +223,12 @@ func (s *SelectorClient) Path() *pan.Path {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	//log.Printf("Returning %+v", s.paths[*msg.Fingerprint])
-	return s.paths[*msg.Fingerprint]
-	//return s.references[0] //path
+	if msg.Fingerprint != nil {
+		return s.paths[*msg.Fingerprint]
+	}
+	return nil
 }
+
 func (s *SelectorClient) PathDown(fp pan.PathFingerprint, pi pan.PathInterface) {
 	log.Println("PathDown called")
 	s.paths[fp] = nil // remove from local table

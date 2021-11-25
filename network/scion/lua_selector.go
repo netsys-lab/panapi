@@ -157,6 +157,7 @@ func NewLuaSelector(script string) (rpc.ServerSelector, error) {
 		"pathdown",
 		"refresh",
 		"close",
+		//"periodic",
 	} {
 		s := fmt.Sprintf("function %s not implemented in script", fn)
 		mod[fn] = func(L *lua.LState) int {
@@ -182,6 +183,14 @@ func NewLuaSelector(script string) (rpc.ServerSelector, error) {
 		l.Printf("loaded selector from file %s", script)
 		L.Push(fn)
 		err = L.PCall(0, lua.MultRet, nil)
+		if err != nil {
+			panic(err)
+			return nil, err
+		}
+		/*		go func(L *lua.LState) {
+				ticker := time.
+				for
+			}(L)*/
 		return &LuaSelector{
 			L:     L,
 			state: new_state(),
