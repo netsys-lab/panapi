@@ -8,6 +8,7 @@ import (
 type Message interface {
 	String() string
 	io.ReadWriter
+	AddMIMEHeaderToMesaage() error
 }
 
 type Connection interface {

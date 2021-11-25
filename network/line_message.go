@@ -45,3 +45,7 @@ func (m LineMessage) Write(p []byte) (int, error) {
 	}
 	return n, err
 }
+
+func (m LineMessage) AddMIMEHeaderToMesaage() error {
+	return nil
+}

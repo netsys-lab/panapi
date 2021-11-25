@@ -14,10 +14,11 @@ func main() {
 func runClient() error {
 	RemoteSpecifier := panapi.NewRemoteEndpoint()
 	RemoteSpecifier.WithNetwork("IP")
-	RemoteSpecifier.WithAddress("www.google.com:80")
+	RemoteSpecifier.WithAddress("127.0.0.1:8080")
 	RemoteSpecifier.WithTransport("TCP")
+	tps := network.NewTransportProperties()
 
-	Preconnection, err := panapi.NewPreconnection(RemoteSpecifier)
+	Preconnection, err := panapi.NewPreconnection(RemoteSpecifier, tps)
 	fcheck(err)
 
 	Connection, err := Preconnection.Initiate()
@@ -25,12 +26,17 @@ func runClient() error {
 
 	defer Connection.Close()
 
-	Connection.Send(network.DummyMessage("GET / HTTP/1.0\r\n\r\n"))
+	toSend := network.NewFixedMessageString("GET / HTTP/1.0\r\n\r\n")
+	toSend.Header.Add("content-type", "text")
+	err = toSend.AddMIMEHeaderToMesaage()
+	fcheck(err)
+	Connection.Send(toSend)
 
-	m, err := Connection.Receive()
+	response := network.NewFixedMessage(1024)
+	err = Connection.Receive(response)
 	fcheck(err)
 
-	log.Printf("Message: %s\n", m)
+	log.Printf("Message: %s", response)
 
 	return nil
 

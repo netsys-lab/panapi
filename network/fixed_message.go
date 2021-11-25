@@ -2,22 +2,27 @@ package network
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"net/textproto"
 )
 
 type FixedMessage struct {
 	b          []byte
 	readindex  int
 	writeindex int
+	Header     *textproto.MIMEHeader
 }
 
 func NewFixedMessageString(s string) *FixedMessage {
 	b := []byte(s)
-	return &FixedMessage{b, 0, len(b)}
+	h := make(textproto.MIMEHeader)
+	return &FixedMessage{b, 0, len(b), &h}
 }
 
 func NewFixedMessage(size int) *FixedMessage {
-	return &FixedMessage{make([]byte, size), 0, 0}
+	h := make(textproto.MIMEHeader)
+	return &FixedMessage{make([]byte, size), 0, 0, &h}
 }
 
 func (m FixedMessage) String() string {
@@ -49,4 +54,26 @@ func (m FixedMessage) Write(p []byte) (i int, err error) {
 		err = EOM
 	}
 	return
+}
+
+// should the user call this?
+// or should get called by the message before read?
+// if user is going to call this name should be more obvious
+// updateMessageWithMimeHeader maybe?
+
+func (m FixedMessage) AddMIMEHeaderToMesaage() error {
+
+	var s string
+	for key, val := range *m.Header {
+		// might need to add carriage return at
+		// the end of each header line
+		s = fmt.Sprintf("%s: %s\n", key, val)
+	}
+
+	b := []byte(s)
+	b = append(m.b, b...)
+
+	m.b = b
+
+	return nil
 }
