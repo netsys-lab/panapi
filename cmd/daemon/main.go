@@ -2,6 +2,8 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
@@ -10,6 +12,8 @@ import (
 
 	"runtime/pprof"
 
+	"github.com/lucas-clemente/quic-go/logging"
+	"github.com/lucas-clemente/quic-go/qlog"
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 	"github.com/netsys-lab/panapi/network/scion"
 	"github.com/netsys-lab/panapi/rpc"
@@ -55,8 +59,18 @@ func main() {
 		})
 	}
 
+	tracer := qlog.NewTracer(
+		func(p logging.Perspective, connectionID []byte) io.WriteCloser {
+			fname := fmt.Sprintf("/tmp/quic-tracer-%d-%x.log", p, connectionID)
+			log.Println("quic tracer file opened as", fname)
+			f, err := os.Create(fname)
+			if err != nil {
+				panic(err)
+			}
+			return f
+		})
 	//serverselector := rpc.NewServerSelectorFunc(func(raddr,
-	server, err := rpc.NewSelectorServer(selector)
+	server, err := rpc.NewServer(selector, tracer)
 	if err != nil {
 		log.Fatalln(err)
 	}

@@ -3,23 +3,16 @@ package scion
 import (
 	"context"
 	"crypto/tls"
-	//"fmt"
-	//	"io"
+
 	"log"
 	"net"
-	//	"os"
-	//	"time"
-
-	//"time"
 
 	"github.com/lucas-clemente/quic-go"
-	//	"github.com/lucas-clemente/quic-go/logging"
-	//	"github.com/lucas-clemente/quic-go/qlog"
+	"github.com/lucas-clemente/quic-go/logging"
 
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
-
 	"github.com/netsec-ethz/scion-apps/pkg/quicutil"
-	"github.com/netsys-lab/panapi/internal/stats"
+
 	"github.com/netsys-lab/panapi/network"
 	"github.com/netsys-lab/panapi/rpc"
 )
@@ -51,7 +44,7 @@ func getSelector(tp *network.TransportProperties) (selector pan.Selector) {
 func NewQUICDialer(address string, tp *network.TransportProperties) (*QUICDialer, error) {
 	selector := getSelector(tp)
 	addr, err := pan.ResolveUDPAddr(address)
-	return &QUICDialer{addr, selector}, err
+	return &QUICDialer{addr, selector, tp}, err
 }
 
 func (d *QUICDialer) Dial() (network.Connection, error) {
@@ -60,7 +53,17 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 		InsecureSkipVerify: true,
 		NextProtos:         []string{"panapi-quic-test"},
 	}
-	conn, err := pan.DialQUIC(context.Background(), nil, d.raddr, nil, d.selector, "", tlsConf, nil)
+	var tracer logging.Tracer
+	daemon, err := net.DialUnix("unix", nil, rpc.DefaultDaemonAddress)
+	if err != nil {
+		log.Printf("Could not connect to PANAPI Deamon: %s", err)
+		log.Println("Not using tracer")
+	} else {
+		tracer = rpc.NewTracerClient(daemon)
+	}
+
+	log.Printf("%+v", tracer)
+	conn, err := pan.DialQUIC(context.Background(), nil, d.raddr, nil, d.selector, "", tlsConf, &quic.Config{Tracer: tracer})
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -91,17 +94,17 @@ func NewQUICListener(address string, tp *network.TransportProperties) (*QUICList
 	if err != nil {
 		return nil, err
 	}
+	var tracer logging.Tracer
+	conn, err := net.DialUnix("unix", nil, rpc.DefaultDaemonAddress)
+	if err != nil {
+		log.Printf("Could not connect to PANAPI Deamon: %s", err)
+		log.Println("Not using tracer")
+	} else {
+		tracer = rpc.NewTracerClient(conn)
+	}
+
 	listener, err := pan.ListenQUIC(context.Background(), &net.UDPAddr{Port: addr.Port}, nil, tlsConf, &quic.Config{
-		/*Tracer: qlog.NewTracer(func(p logging.Perspective, connectionID []byte) io.WriteCloser {
-			fname := fmt.Sprintf("/tmp/%s-%x-quic-listener-%d.log", time.Now().Format("2006-01-02-15-04"), connectionID, p)
-			log.Println("quic tracer file opened as", fname)
-			f, err := os.Create(fname)
-			if err != nil {
-				panic(err)
-			}
-			return f
-		}),*/
-		Tracer: stats.NewTracer(),
+		Tracer: tracer,
 	})
 	if err != nil {
 		return nil, err
