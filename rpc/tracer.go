@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/lucas-clemente/quic-go"
 	"github.com/lucas-clemente/quic-go/logging"
 )
 
@@ -39,11 +40,16 @@ func NewTracerClient(conn io.ReadWriteCloser) logging.Tracer {
 
 func (c TracerClient) TracerForConnection(ctx context.Context, p logging.Perspective, odcid logging.ConnectionID) logging.ConnectionTracer {
 
-	c.l.Printf("TracerForConnection %+v %+v %+v", ctx, p, odcid)
+	c.l.Printf("TracerForConnection %d %+v %+v", ctx.Value(quic.SessionTracingKey), p, odcid)
+	id, ok := ctx.Value(quic.SessionTracingKey).(uint64)
+	if !ok {
+		c.l.Println("cast failed")
+	}
 	err := c.client.Call(
 		"TracerServer.TracerForConnection",
 		&TracerMsg{
 			//Context:      ctx
+			TracingID:    &id,
 			Perspective:  &p,
 			ConnectionID: &odcid,
 		},
@@ -85,6 +91,7 @@ func (c TracerClient) DroppedPacket(addr net.Addr, tp logging.PacketType, n logg
 
 type TracerMsg struct {
 	//Context      context.Context
+	TracingID    *uint64
 	Perspective  *logging.Perspective
 	ConnectionID *logging.ConnectionID
 	Addr         net.Addr
@@ -113,13 +120,12 @@ func NewTracerServer(tracer logging.Tracer) *TracerServer {
 			time.Sleep(time.Second)
 		}
 	}(f)
-
 	return &TracerServer{tracer, f, log.New(f, "tracer", log.Lshortfile|log.Ltime)}
 }
 
 func (s *TracerServer) TracerForConnection(args, resp *TracerMsg) error {
-	if args.Perspective != nil && args.ConnectionID != nil {
-		ctx := context.TODO()
+	if args.Perspective != nil && args.ConnectionID != nil && args.TracingID != nil {
+		ctx := context.WithValue(context.Background(), quic.SessionTracingKey, *args.TracingID)
 		s.l.Printf("TracerForConnection %+v %+v %+v", ctx, *args.Perspective, *args.ConnectionID)
 		s.tracer.TracerForConnection(ctx, *args.Perspective, *args.ConnectionID)
 	} else {
