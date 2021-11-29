@@ -21,9 +21,19 @@ type QUICDialer struct {
 	raddr    pan.UDPAddr
 	selector pan.Selector
 	tp       *network.TransportProperties
+	client   *rpc.Client
 }
 
-func getSelector(tp *network.TransportProperties) (selector pan.Selector) {
+func (d *QUICDialer) getSelector() (selector pan.Selector) {
+	return
+}
+
+func NewQUICDialer(address string, tp *network.TransportProperties) (*QUICDialer, error) {
+	var (
+		selector pan.Selector
+		client   *rpc.Client
+	)
+
 	if tp != nil {
 		conn, err := net.DialUnix("unix", nil, rpc.DefaultDaemonAddress)
 		if err != nil {
@@ -32,19 +42,19 @@ func getSelector(tp *network.TransportProperties) (selector pan.Selector) {
 			selector = &pan.DefaultSelector{}
 		} else {
 			log.Println("using daemon selector")
-			selector = rpc.NewSelectorClient(conn)
+			client, err = rpc.NewClient(conn)
+			if err != nil {
+				return nil, err
+			}
+			selector = rpc.NewSelectorClient(client)
+
 		}
-		return
 	} else {
 		log.Println("no transport properties given")
 	}
-	return
-}
 
-func NewQUICDialer(address string, tp *network.TransportProperties) (*QUICDialer, error) {
-	selector := getSelector(tp)
 	addr, err := pan.ResolveUDPAddr(address)
-	return &QUICDialer{addr, selector, tp}, err
+	return &QUICDialer{addr, selector, tp, client}, err
 }
 
 func (d *QUICDialer) Dial() (network.Connection, error) {
@@ -54,12 +64,11 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 		NextProtos:         []string{"panapi-quic-test"},
 	}
 	var tracer logging.Tracer
-	daemon, err := net.DialUnix("unix", nil, rpc.DefaultDaemonAddress)
-	if err != nil {
-		log.Printf("Could not connect to PANAPI Deamon: %s", err)
+	if d.client != nil {
+		log.Printf("Could not connect to PANAPI Deamon")
 		log.Println("Not using tracer")
 	} else {
-		tracer = rpc.NewTracerClient(daemon)
+		tracer = rpc.NewTracerClient(d.client)
 	}
 
 	log.Printf("%+v", tracer)
@@ -78,6 +87,7 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 
 type QUICListener struct {
 	listener quic.Listener
+	client   *rpc.Client
 }
 
 func NewQUICListener(address string, tp *network.TransportProperties) (*QUICListener, error) {
@@ -91,16 +101,21 @@ func NewQUICListener(address string, tp *network.TransportProperties) (*QUICList
 		NextProtos: []string{"panapi-quic-test"},
 	}
 	//tlsConf, err := generateTLSConfig()
-	if err != nil {
-		return nil, err
-	}
-	var tracer logging.Tracer
+	var (
+		tracer logging.Tracer
+		client *rpc.Client
+	)
 	conn, err := net.DialUnix("unix", nil, rpc.DefaultDaemonAddress)
 	if err != nil {
 		log.Printf("Could not connect to PANAPI Deamon: %s", err)
 		log.Println("Not using tracer")
 	} else {
-		tracer = rpc.NewTracerClient(conn)
+		client, err = rpc.NewClient(conn)
+		if err != nil {
+			return nil, err
+		} else {
+			tracer = rpc.NewTracerClient(client)
+		}
 	}
 
 	listener, err := pan.ListenQUIC(context.Background(), &net.UDPAddr{Port: addr.Port}, nil, tlsConf, &quic.Config{
@@ -109,7 +124,7 @@ func NewQUICListener(address string, tp *network.TransportProperties) (*QUICList
 	if err != nil {
 		return nil, err
 	}
-	return &QUICListener{listener}, nil
+	return &QUICListener{listener, client}, nil
 }
 
 func (l *QUICListener) Listen() (network.Connection, error) {
