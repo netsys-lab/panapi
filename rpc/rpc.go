@@ -26,11 +26,12 @@ func (s *IDServer) GetID(arg, resp *IDMsg) error {
 }
 
 func NewServer(selector ServerSelector, tracer logging.Tracer) (*rpc.Server, error) {
-	err := rpc.Register(IDServer{42})
+	/*err := rpc.Register(IDServer{42})
 	if err != nil {
+		panic(err)
 		return nil, err
-	}
-	err = rpc.Register(NewSelectorServer(selector))
+	}*/
+	err := rpc.Register(NewSelectorServer(selector))
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +39,10 @@ func NewServer(selector ServerSelector, tracer logging.Tracer) (*rpc.Server, err
 	if err != nil {
 		return nil, err
 	}
-	//err = rpc.Register(NewConnectionTracerServer(
+	err = rpc.Register(NewConnectionTracerServer(tracer, log.Default()))
+	if err != nil {
+		return nil, err
+	}
 	return rpc.DefaultServer, nil
 }
 
@@ -64,13 +68,15 @@ func NewClient(conn io.ReadWriteCloser) (*Client, error) {
 	}(f)
 	//f := os.Stderr
 
-	var id IDMsg
-	err = client.Call("IDServer.GetID", &IDMsg{}, &id)
+	n := 42
+	var id = &IDMsg{Value: &n}
+	/*err = client.Call("IDServer.GetID", &IDMsg{}, &id)
 	if err != nil {
 		return nil, err
-	} else {
-		log.Printf("RPC connection etablished with ID %d", *id.Value)
-	}
+	} else {*/
+
+	log.Printf("RPC connection etablished with ID %d", *id.Value)
+	//}
 
 	return &Client{client, log.New(f, "rpc-client", log.Lshortfile|log.Ltime), *id.Value}, nil
 }

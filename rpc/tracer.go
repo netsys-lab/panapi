@@ -25,10 +25,10 @@ func (c TracerClient) TracerForConnection(ctx context.Context, p logging.Perspec
 
 	id, ok := ctx.Value(quic.SessionTracingKey).(uint64)
 	if !ok {
-		c.l.Println("cast failed")
+		c.l.Fatalln("cast failed")
 	}
 	c.l.Printf("TracerForConnection %d %d", p, id)
-	err := c.rpc.Call(
+	/*err := c.rpc.Call(
 		"TracerServer.TracerForConnection",
 		&TracerMsg{
 			//Context:      ctx
@@ -41,8 +41,8 @@ func (c TracerClient) TracerForConnection(ctx context.Context, p logging.Perspec
 	)
 	if err != nil {
 		c.l.Println(err)
-	}
-	return NewConnectionTracerClient(c.rpc, p, odcid)
+	}*/
+	return NewConnectionTracerClient(c.rpc, id, p, odcid)
 	//return nil
 }
 
@@ -111,8 +111,8 @@ func NewTracerServer(tracer logging.Tracer) *TracerServer {
 	return &TracerServer{tracer, f, log.New(f, "tracer", log.Lshortfile|log.Ltime)}
 }
 
-func (s *TracerServer) TracerForConnection(args, resp *TracerMsg) error {
-	if args.Perspective != nil && args.ConnectionID != nil && args.TracingID != nil {
+/*func (s *TracerServer) TracerForConnection(args, resp *TracerMsg) error {
+	if args.ID != nil && args.Perspective != nil && args.ConnectionID != nil && args.TracingID != nil {
 		ctx := context.WithValue(context.Background(), quic.SessionTracingKey, *args.TracingID)
 		s.l.Printf("TracerForConnection %+v %+v %+v", ctx, *args.Perspective, *args.ConnectionID)
 		NewConnectionTracerServer(s.tracer.TracerForConnection(ctx, *args.Perspective, *args.ConnectionID), s.l)
@@ -120,7 +120,7 @@ func (s *TracerServer) TracerForConnection(args, resp *TracerMsg) error {
 		return ErrDeref
 	}
 	return nil
-}
+        }*/
 
 func (s *TracerServer) SentPacket(args, resp *TracerMsg) error {
 	if args.Addr != nil && args.ByteCount != nil {

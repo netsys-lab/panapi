@@ -64,7 +64,7 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 		NextProtos:         []string{"panapi-quic-test"},
 	}
 	var tracer logging.Tracer
-	if d.client != nil {
+	if d.client == nil {
 		log.Printf("Could not connect to PANAPI Deamon")
 		log.Println("Not using tracer")
 	} else {
