@@ -40,11 +40,11 @@ func NewTracerClient(conn io.ReadWriteCloser) logging.Tracer {
 
 func (c TracerClient) TracerForConnection(ctx context.Context, p logging.Perspective, odcid logging.ConnectionID) logging.ConnectionTracer {
 
-	c.l.Printf("TracerForConnection %d %+v %+v", ctx.Value(quic.SessionTracingKey), p, odcid)
 	id, ok := ctx.Value(quic.SessionTracingKey).(uint64)
 	if !ok {
 		c.l.Println("cast failed")
 	}
+	c.l.Printf("TracerForConnection %d %d", p, id)
 	err := c.client.Call(
 		"TracerServer.TracerForConnection",
 		&TracerMsg{
@@ -58,7 +58,7 @@ func (c TracerClient) TracerForConnection(ctx context.Context, p logging.Perspec
 	if err != nil {
 		c.l.Println(err)
 	}
-	return nil
+	return NewConnectionTracerClient(c.client, c.l, p, odcid)
 }
 
 func (c TracerClient) SentPacket(addr net.Addr, hdr *logging.Header, n logging.ByteCount, fs []logging.Frame) {
