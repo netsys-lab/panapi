@@ -13,6 +13,21 @@ import (
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 )
 
+type RTTStats struct {
+	LatestRTT, MaxAckDelay, MeanDeviation, MinRTT, PTO, SmoothedRTT time.Duration
+}
+
+func NewRTTStats(stats *logging.RTTStats) *RTTStats {
+	return &RTTStats{
+		LatestRTT:     stats.LatestRTT(),
+		MaxAckDelay:   stats.MaxAckDelay(),
+		MeanDeviation: stats.MeanDeviation(),
+		MinRTT:        stats.MinRTT(),
+		PTO:           stats.PTO(false),
+		SmoothedRTT:   stats.SmoothedRTT(),
+	}
+}
+
 type ConnectionTracerMsg struct {
 	Local, Remote                            *pan.UDPAddr
 	OdcID, SrcConnID, DestConnID             *logging.ConnectionID
@@ -39,6 +54,7 @@ type ConnectionTracerMsg struct {
 	Generation                               logging.KeyPhase
 	TimerType                                logging.TimerType
 	Time                                     *time.Time
+	RTTStats                                 *RTTStats
 }
 
 func non_nil_string(name string, i interface{}) string {
@@ -281,6 +297,7 @@ func (c *ConnectionTracerClient) UpdatedMetrics(rttStats *logging.RTTStats, cwnd
 	msg.Cwnd = cwnd
 	msg.ByteCount = bytesInFlight
 	msg.Packets = packetsInFlight
+	msg.RTTStats = NewRTTStats(rttStats)
 	err := c.rpc.Call("ConnectionTracerServer.UpdatedMetrics",
 		msg,
 		&NilMsg{},
