@@ -25,7 +25,7 @@ func (s *IDServer) GetID(arg, resp *IDMsg) error {
 	return nil
 }
 
-func NewServer(selector ServerSelector, tracer logging.Tracer) (*rpc.Server, error) {
+func NewServer(selector ServerSelector, tracer logging.Tracer, connectionTracer ServerConnectionTracer) (*rpc.Server, error) {
 	/*err := rpc.Register(IDServer{42})
 	if err != nil {
 		panic(err)
@@ -39,7 +39,7 @@ func NewServer(selector ServerSelector, tracer logging.Tracer) (*rpc.Server, err
 	if err != nil {
 		return nil, err
 	}
-	err = rpc.Register(NewConnectionTracerServer(tracer, log.Default()))
+	err = rpc.Register(NewConnectionTracerServer(connectionTracer))
 	if err != nil {
 		return nil, err
 	}

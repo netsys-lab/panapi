@@ -1,17 +1,45 @@
 package rpc
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log"
 	"net"
 	"time"
 
-	"github.com/lucas-clemente/quic-go"
 	"github.com/lucas-clemente/quic-go/logging"
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 )
+
+type ServerConnectionTracer interface {
+	TracerForConnection(tracing_id uint64, p logging.Perspective, odcid logging.ConnectionID) error
+	StartedConnection(tracing_id uint64, local, remote net.Addr, srcConnID, destConnID logging.ConnectionID) error
+	NegotiatedVersion(tracing_id uint64, chosen logging.VersionNumber, clientVersions, serverVersions []logging.VersionNumber) error
+	ClosedConnection(tracing_id uint64, err error) error
+	SentTransportParameters(uint64, *logging.TransportParameters) error
+	ReceivedTransportParameters(uint64, *logging.TransportParameters) error
+	RestoredTransportParameters(tracing_id uint64, parameters *logging.TransportParameters) error
+	SentPacket(tracing_id uint64, hdr *logging.ExtendedHeader, size logging.ByteCount, ack *logging.AckFrame, frames []logging.Frame) error
+	ReceivedVersionNegotiationPacket(uint64, *logging.Header, []logging.VersionNumber) error
+	ReceivedRetry(uint64, *logging.Header) error
+	ReceivedPacket(tracing_id uint64, hdr *logging.ExtendedHeader, size logging.ByteCount, frames []logging.Frame) error
+	BufferedPacket(uint64, logging.PacketType) error
+	DroppedPacket(uint64, logging.PacketType, logging.ByteCount, logging.PacketDropReason) error
+	UpdatedMetrics(tracing_id uint64, rttStats *RTTStats, cwnd, bytesInFlight logging.ByteCount, packetsInFlight int) error
+	AcknowledgedPacket(uint64, logging.EncryptionLevel, logging.PacketNumber) error
+	LostPacket(uint64, logging.EncryptionLevel, logging.PacketNumber, logging.PacketLossReason) error
+	UpdatedCongestionState(uint64, logging.CongestionState) error
+	UpdatedPTOCount(tracing_id uint64, value uint32) error
+	UpdatedKeyFromTLS(uint64, logging.EncryptionLevel, logging.Perspective) error
+	UpdatedKey(tracing_id uint64, generation logging.KeyPhase, remote bool) error
+	DroppedEncryptionLevel(uint64, logging.EncryptionLevel) error
+	DroppedKey(tracing_id uint64, generation logging.KeyPhase) error
+	SetLossTimer(uint64, logging.TimerType, logging.EncryptionLevel, time.Time) error
+	LossTimerExpired(uint64, logging.TimerType, logging.EncryptionLevel) error
+	LossTimerCanceled(tracing_id uint64) error
+	Close(tracing_id uint64) error
+	Debug(tracing_id uint64, name, msg string) error
+}
 
 type RTTStats struct {
 	LatestRTT, MaxAckDelay, MeanDeviation, MinRTT, PTO, SmoothedRTT time.Duration
@@ -473,13 +501,12 @@ func (c *ConnectionTracerClient) Debug(name, msg string) {
 type NilMsg struct{}
 
 type ConnectionTracerServer struct {
-	l        *log.Logger
-	tracer   logging.Tracer
-	ctracers map[uint64]logging.ConnectionTracer
+	l  *log.Logger
+	ct ServerConnectionTracer
 }
 
-func NewConnectionTracerServer(tracer logging.Tracer, l *log.Logger) *ConnectionTracerServer {
-	return &ConnectionTracerServer{l, tracer, map[uint64]logging.ConnectionTracer{}}
+func NewConnectionTracerServer(ct ServerConnectionTracer) *ConnectionTracerServer {
+	return &ConnectionTracerServer{log.Default(), ct}
 }
 
 func (c *ConnectionTracerServer) NewTracerForConnection(args *ConnectionTracerMsg, resp *NilMsg) error {
@@ -487,9 +514,8 @@ func (c *ConnectionTracerServer) NewTracerForConnection(args *ConnectionTracerMs
 		return ErrDeref
 	}
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id] = c.tracer.TracerForConnection(context.WithValue(context.Background(), quic.SessionTracingKey, tracing_id), args.Perspective, *args.OdcID)
+	return c.ct.TracerForConnection(tracing_id, args.Perspective, *args.OdcID)
 
-	return nil
 }
 
 func (c *ConnectionTracerServer) StartedConnection(args *ConnectionTracerMsg, resp *NilMsg) error {
@@ -498,133 +524,133 @@ func (c *ConnectionTracerServer) StartedConnection(args *ConnectionTracerMsg, re
 		return ErrDeref
 	}
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].StartedConnection(args.Local, args.Remote, *args.SrcConnID, *args.DestConnID)
-	return nil
+	return c.ct.StartedConnection(tracing_id, args.Local, args.Remote, *args.SrcConnID, *args.DestConnID)
+
 }
 func (c *ConnectionTracerServer) NegotiatedVersion(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("NegotiatedVersion called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].NegotiatedVersion(args.Chosen, args.ClientVersions, args.ServerVersions)
-	return nil
+	return c.ct.NegotiatedVersion(tracing_id, args.Chosen, args.ClientVersions, args.ServerVersions)
+
 }
 func (c *ConnectionTracerServer) ClosedConnection(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("ClosedConnection called")
 	tracing_id := args.TracingID
 
 	if args.ErrorMsg == nil {
-		c.ctracers[tracing_id].ClosedConnection(nil)
+		return c.ct.ClosedConnection(tracing_id, nil)
 	} else {
-		c.ctracers[tracing_id].ClosedConnection(errors.New(*args.ErrorMsg))
+		return c.ct.ClosedConnection(tracing_id, errors.New(*args.ErrorMsg))
 	}
-	return nil
+
 }
 func (c *ConnectionTracerServer) SentTransportParameters(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("SentTransportParameters called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].SentTransportParameters(args.Parameters)
-	return nil
+	return c.ct.SentTransportParameters(tracing_id, args.Parameters)
+
 }
 func (c *ConnectionTracerServer) ReceivedTransportParameters(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("ReceivedTransportParameters called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].ReceivedTransportParameters(args.Parameters)
-	return nil
+	return c.ct.ReceivedTransportParameters(tracing_id, args.Parameters)
+
 }
 func (c *ConnectionTracerServer) RestoredTransportParameters(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("RestoredTransportParameters called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].RestoredTransportParameters(args.Parameters)
-	return nil
+	return c.ct.RestoredTransportParameters(tracing_id, args.Parameters)
+
 }
 func (c *ConnectionTracerServer) SentPacket(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("SentPacket called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].SentPacket(args.ExtendedHeader, args.ByteCount, args.AckFrame, args.Frames)
-	return nil
+	return c.ct.SentPacket(tracing_id, args.ExtendedHeader, args.ByteCount, args.AckFrame, args.Frames)
+
 }
 func (c *ConnectionTracerServer) ReceivedVersionNegotiationPacket(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("ReceivedVersionNegotiationPacket called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].ReceivedVersionNegotiationPacket(args.Header, args.Versions)
-	return nil
+	return c.ct.ReceivedVersionNegotiationPacket(tracing_id, args.Header, args.Versions)
+
 }
 func (c *ConnectionTracerServer) ReceivedRetry(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("ReceivedRetry called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].ReceivedRetry(args.Header)
-	return nil
+	return c.ct.ReceivedRetry(tracing_id, args.Header)
+
 }
 func (c *ConnectionTracerServer) ReceivedPacket(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("ReceivedPacket called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].ReceivedPacket(args.ExtendedHeader, args.ByteCount, args.Frames)
-	return nil
+	return c.ct.ReceivedPacket(tracing_id, args.ExtendedHeader, args.ByteCount, args.Frames)
+
 }
 func (c *ConnectionTracerServer) BufferedPacket(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("BufferedPacket called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].BufferedPacket(args.PacketType)
-	return nil
+	return c.ct.BufferedPacket(tracing_id, args.PacketType)
+
 }
 func (c *ConnectionTracerServer) DroppedPacket(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("DroppedPacket called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].DroppedPacket(args.PacketType, args.ByteCount, args.DropReason)
-	return nil
+	return c.ct.DroppedPacket(tracing_id, args.PacketType, args.ByteCount, args.DropReason)
+
 }
 func (c *ConnectionTracerServer) UpdatedMetrics(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("UpdatedMetrics called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].UpdatedMetrics(&logging.RTTStats{}, args.Cwnd, args.ByteCount, args.Packets)
-	return nil
+	return c.ct.UpdatedMetrics(tracing_id, args.RTTStats, args.Cwnd, args.ByteCount, args.Packets)
+
 }
 func (c *ConnectionTracerServer) AcknowledgedPacket(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("AcknowledgedPacket called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].AcknowledgedPacket(args.EncryptionLevel, args.PacketNumber)
-	return nil
+	return c.ct.AcknowledgedPacket(tracing_id, args.EncryptionLevel, args.PacketNumber)
+
 }
 func (c *ConnectionTracerServer) LostPacket(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("LostPacket called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].LostPacket(args.EncryptionLevel, args.PacketNumber, args.LossReason)
-	return nil
+	return c.ct.LostPacket(tracing_id, args.EncryptionLevel, args.PacketNumber, args.LossReason)
+
 }
 func (c *ConnectionTracerServer) UpdatedCongestionState(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Printf("UpdatedCongestionState called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].UpdatedCongestionState(args.CongestionState)
-	return nil
+	return c.ct.UpdatedCongestionState(tracing_id, args.CongestionState)
+
 }
 func (c *ConnectionTracerServer) UpdatedPTOCount(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("UpdatedPTOCount called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].UpdatedPTOCount(args.PTOCount)
-	return nil
+	return c.ct.UpdatedPTOCount(tracing_id, args.PTOCount)
+
 }
 func (c *ConnectionTracerServer) UpdatedKeyFromTLS(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("UpdatedKeyFromTLS called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].UpdatedKeyFromTLS(args.EncryptionLevel, args.Perspective)
-	return nil
+	return c.ct.UpdatedKeyFromTLS(tracing_id, args.EncryptionLevel, args.Perspective)
+
 }
 func (c *ConnectionTracerServer) UpdatedKey(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("UpdatedKey called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].UpdatedKey(args.Generation, args.Bool)
-	return nil
+	return c.ct.UpdatedKey(tracing_id, args.Generation, args.Bool)
+
 }
 func (c *ConnectionTracerServer) DroppedEncryptionLevel(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("DroppedEncryptionLevel called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].DroppedEncryptionLevel(args.EncryptionLevel)
-	return nil
+	return c.ct.DroppedEncryptionLevel(tracing_id, args.EncryptionLevel)
+
 }
 func (c *ConnectionTracerServer) DroppedKey(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("DroppedKey called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].DroppedKey(args.Generation)
-	return nil
+	return c.ct.DroppedKey(tracing_id, args.Generation)
+
 }
 func (c *ConnectionTracerServer) SetLossTimer(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("SetLossTimer called")
@@ -632,26 +658,26 @@ func (c *ConnectionTracerServer) SetLossTimer(args *ConnectionTracerMsg, resp *N
 		return ErrDeref
 	}
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].SetLossTimer(args.TimerType, args.EncryptionLevel, *args.Time)
-	return nil
+	return c.ct.SetLossTimer(tracing_id, args.TimerType, args.EncryptionLevel, *args.Time)
+
 }
 func (c *ConnectionTracerServer) LossTimerExpired(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("LossTimerExpired called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].LossTimerExpired(args.TimerType, args.EncryptionLevel)
-	return nil
+	return c.ct.LossTimerExpired(tracing_id, args.TimerType, args.EncryptionLevel)
+
 }
 func (c *ConnectionTracerServer) LossTimerCanceled(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("LossTimerCanceled called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].LossTimerCanceled()
-	return nil
+	return c.ct.LossTimerCanceled(tracing_id)
+
 }
 func (c *ConnectionTracerServer) Close(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("Close called")
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].Close()
-	return nil
+	return c.ct.Close(tracing_id)
+
 }
 func (c *ConnectionTracerServer) Debug(args *ConnectionTracerMsg, resp *NilMsg) error {
 	c.l.Println("Debug called")
@@ -659,6 +685,6 @@ func (c *ConnectionTracerServer) Debug(args *ConnectionTracerMsg, resp *NilMsg) 
 		return ErrDeref
 	}
 	tracing_id := args.TracingID
-	c.ctracers[tracing_id].Debug(*args.Key, *args.Value)
-	return nil
+	return c.ct.Debug(tracing_id, *args.Key, *args.Value)
+
 }

@@ -135,7 +135,10 @@ type LuaSelector struct {
 }
 
 //func NewLuaSelector(script string) (*LuaSelector, error) {
-func NewLuaSelector(state *State) rpc.ServerSelector {
+func NewSelector(state *State) rpc.ServerSelector {
+	state.Lock()
+	defer state.Unlock()
+
 	mod := map[string]lua.LGFunction{}
 	for _, fn := range []string{
 		"initialize",
