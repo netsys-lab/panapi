@@ -50,7 +50,10 @@ func main() {
 		}
 	}
 
-	selector, err = lua.NewLuaSelector(script)
+	lua_state := lua.NewState()
+	selector = lua.NewLuaSelector(lua_state)
+
+	err = lua_state.LoadScript(script)
 	if err != nil {
 		log.Printf("Could not load path-selection script: %s", err)
 		log.Println("Falling back to default selector")

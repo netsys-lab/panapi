@@ -2,15 +2,12 @@ package lua
 
 import (
 	"fmt"
-	"os"
+	"log"
 	"time"
 
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 	"github.com/netsys-lab/panapi/rpc"
 	"github.com/yuin/gopher-lua"
-
-	"log"
-	"sync"
 )
 
 func new_lua_path_interface(intf pan.PathInterface) *lua.LTable {
@@ -131,27 +128,14 @@ func (s state) set_paths(addr pan.UDPAddr, ppaths []*pan.Path) (lpaths []*lua.LT
 }
 
 type LuaSelector struct {
-	mutex sync.Mutex
-	L     *lua.LState
-	state state
-	l     *log.Logger
-	mod   *lua.LTable
-	d     time.Duration
+	*State
+	state
+	mod *lua.LTable
+	d   time.Duration
 }
 
 //func NewLuaSelector(script string) (*LuaSelector, error) {
-func NewLuaSelector(script string) (rpc.ServerSelector, error) {
-	//load script
-	file, err := os.Open(script)
-	if err != nil {
-		return nil, err
-	}
-	l := log.Default() //.New(os.Stderr, "lua", log.Ltime|log.Lshortfile)
-	l.SetFlags(log.Ltime)
-	l.SetPrefix("lua ")
-
-	//initialize Lua VM
-	L := lua.NewState()
+func NewLuaSelector(state *State) rpc.ServerSelector {
 	mod := map[string]lua.LGFunction{}
 	for _, fn := range []string{
 		"initialize",
@@ -163,7 +147,7 @@ func NewLuaSelector(script string) (rpc.ServerSelector, error) {
 	} {
 		s := fmt.Sprintf("function %s not implemented in script", fn)
 		mod[fn] = func(L *lua.LState) int {
-			l.Panic(s)
+			state.Logger.Panic(s)
 			return 0
 		}
 	}
@@ -173,65 +157,49 @@ func NewLuaSelector(script string) (rpc.ServerSelector, error) {
 		for i := 1; i <= L.GetTop(); i++ {
 			s += L.Get(i).String() + " "
 		}
-		l.Println(s)
+		state.Println(s)
 		return 0
 	}
 
-	panapi := L.RegisterModule("panapi", mod).(*lua.LTable)
+	panapi := state.RegisterModule("panapi", mod).(*lua.LTable)
 
-	if fn, err := L.Load(file, script); err != nil {
-		return nil, err
-	} else {
-		l.Printf("loaded selector from file %s", script)
-		L.Push(fn)
-		err = L.PCall(0, lua.MultRet, nil)
-		if err != nil {
-			return nil, err
-		}
-		s := &LuaSelector{
-			L:     L,
-			state: new_state(),
-			l:     l,
-			mod:   panapi,
-			d:     time.Second,
-		}
+	s := &LuaSelector{state, new_state(), panapi, time.Second}
 
-		go func(s *LuaSelector) {
-			old := time.Now()
-			for {
-				time.Sleep(s.d)
-				s.mutex.Lock()
-				seconds := time.Since(old).Seconds()
-				s.L.CallByParam(
-					lua.P{
-						Protect: true,
-						Fn:      s.mod.RawGetString("periodic"),
-						NRet:    0,
-					},
-					lua.LNumber(seconds),
-				)
-				old = time.Now()
-				s.mutex.Unlock()
-			}
-		}(s)
-		return s, err
-	}
+	go func(s *LuaSelector) {
+		old := time.Now()
+		for {
+			time.Sleep(s.d)
+			s.Lock()
+			seconds := time.Since(old).Seconds()
+			s.CallByParam(
+				lua.P{
+					Protect: true,
+					Fn:      s.mod.RawGetString("periodic"),
+					NRet:    0,
+				},
+				lua.LNumber(seconds),
+			)
+			old = time.Now()
+			s.Unlock()
+		}
+	}(s)
+	return s
 }
 
 func (s *LuaSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) {
-	s.l.Printf("Initialize(%s,%s,[%d]pan.Path)", local, remote, len(paths))
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.Printf("Initialize(%s,%s,[%d]pan.Path)", local, remote, len(paths))
+	s.Lock()
+	defer s.Unlock()
 
 	//assume that setpaths is called with all the currently valid options
 	//meaning that anything we already know can be flushed
 	s.state.clear_addr(remote)
-	lpaths := s.state.set_paths(remote, paths)
+	lpaths := s.set_paths(remote, paths)
 
 	//call the "setpaths" function in the Lua script
 	//with two arguments
 	//and don't expect a return value
-	err := s.L.CallByParam(
+	err := s.CallByParam(
 		lua.P{
 			Protect: true,
 			Fn:      s.mod.RawGetString("initialize"),
@@ -242,36 +210,36 @@ func (s *LuaSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) {
 		lua_table_slice_to_table(lpaths),
 	)
 	if err != nil {
-		s.l.Fatal("Initialize", err)
+		s.Fatal("Initialize", err)
 	}
 
 }
 
 func (s *LuaSelector) Path(raddr pan.UDPAddr) *pan.Path {
 	//log.Println("Path()")
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
 	//call the "selectpath" function from the Lua script
 	//expect 1 return value
-	err := s.L.CallByParam(lua.P{
+	err := s.CallByParam(lua.P{
 		Protect: true,
 		Fn:      s.mod.RawGetString("selectpath"),
 		NRet:    1}, lua.LString(raddr.String()))
 	if err != nil {
-		s.l.Fatal("Path", err)
+		s.Fatal("Path", err)
 	}
-	lt := s.L.ToTable(-1)
+	lt := s.ToTable(-1)
 	//pop element from the stack
-	s.L.Pop(1)
+	s.Pop(1)
 	return s.state.get_pan_path(lt)
 }
 
 func (s *LuaSelector) PathDown(raddr pan.UDPAddr, fp pan.PathFingerprint, pi pan.PathInterface) {
 	//s.l.Println("PathDown()")
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-	err := s.L.CallByParam(
+	s.Lock()
+	defer s.Unlock()
+	err := s.CallByParam(
 		lua.P{
 			Fn:      s.mod.RawGetString("pathdown"),
 			NRet:    0,
@@ -281,17 +249,17 @@ func (s *LuaSelector) PathDown(raddr pan.UDPAddr, fp pan.PathFingerprint, pi pan
 		lua.LString(fp),
 		new_lua_path_interface(pi),
 	)
-	s.l.Printf("PathDown called with fp %v and pi %v: %s", fp, pi, err)
+	s.Printf("PathDown called with fp %v and pi %v: %s", fp, pi, err)
 	if err != nil {
-		s.l.Fatal(err)
+		s.Fatal(err)
 	}
 
 }
 
 func (s *LuaSelector) Refresh(remote pan.UDPAddr, paths []*pan.Path) {
-	s.l.Println("Refresh()")
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.Println("Refresh()")
+	s.Lock()
+	defer s.Unlock()
 
 	//assume that setpaths is called with all the currently valid options
 	//meaning that anything we already know can be flushed
@@ -301,7 +269,7 @@ func (s *LuaSelector) Refresh(remote pan.UDPAddr, paths []*pan.Path) {
 	//call the "setpaths" function in the Lua script
 	//with two arguments
 	//and don't expect a return value
-	err := s.L.CallByParam(
+	err := s.CallByParam(
 		lua.P{
 			Protect: true,
 			Fn:      s.mod.RawGetString("refresh"),
@@ -311,17 +279,17 @@ func (s *LuaSelector) Refresh(remote pan.UDPAddr, paths []*pan.Path) {
 		lua_table_slice_to_table(lpaths),
 	)
 	if err != nil {
-		s.l.Fatal("refresh", err)
+		s.Fatal("refresh", err)
 	}
 }
 
 func (s *LuaSelector) Close(raddr pan.UDPAddr) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
 	//call the "selectpath" function from the Lua script
 	//expect 1 return value
-	err := s.L.CallByParam(
+	err := s.CallByParam(
 		lua.P{
 			Protect: true,
 			Fn:      s.mod.RawGetString("close"),
