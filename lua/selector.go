@@ -1,4 +1,4 @@
-package scion
+package lua
 
 import (
 	"fmt"

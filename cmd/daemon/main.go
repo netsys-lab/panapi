@@ -15,7 +15,7 @@ import (
 	"github.com/lucas-clemente/quic-go/logging"
 	"github.com/lucas-clemente/quic-go/qlog"
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
-	"github.com/netsys-lab/panapi/network/scion"
+	"github.com/netsys-lab/panapi/lua"
 	"github.com/netsys-lab/panapi/rpc"
 )
 
@@ -50,7 +50,7 @@ func main() {
 		}
 	}
 
-	selector, err = scion.NewLuaSelector(script)
+	selector, err = lua.NewLuaSelector(script)
 	if err != nil {
 		log.Printf("Could not load path-selection script: %s", err)
 		log.Println("Falling back to default selector")
