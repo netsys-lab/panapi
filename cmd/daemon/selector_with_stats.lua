@@ -2,22 +2,23 @@
 -- `indent` sets the initial level of indentation.
 function tprint (tbl, indent)
    if not indent then indent = 0 end
+   s = ""
    for k, v in pairs(tbl) do
       formatting = string.rep("  ", indent) .. k .. ": "
       if type(v) == "table" then
-         print(formatting)
-         tprint(v, indent+1)
+         --print(formatting)
+         s = s ..  formatting .. "\n" .. tprint(v, indent+1)
       else
-         print(formatting .. tostring(v))
+         s = s .. formatting .. tostring(v) .. "\n"
       end
    end
+   return s
 end
 
 -- global "path database variable",
 -- not directly referenced from go
 paths = {}
-print("Hello Ranking SelectionServer")
-
+print("Hello SelectionServer with stats")
 
 function rankpaths(raddr)
    table.sort(
@@ -79,4 +80,86 @@ end
 
 function panapi.Periodic(seconds)
    panapi.Log("Periodic", seconds)
+end
+
+
+
+function stats.TracerForConnection(id, p, odcid)
+   panapi.Log("id:", id, "perspective", p, "odcid", odcid)
+end
+function stats.StartedConnection(laddr, raddr, srcid, dstid)
+   
+end
+function stats.NegotiatedVersion(laddr, raddr)
+
+end
+function stats.ClosedConnection(laddr, raddr)
+
+end
+function stats.SentTransportParameters(laddr, raddr)
+
+end
+function stats.ReceivedTransportParameters(laddr, raddr)
+
+end
+function stats.RestoredTransportParameters(laddr, raddr)
+
+end
+function stats.SentPacket(laddr, raddr)
+
+end
+function stats.ReceivedVersionNegotiationPacket(laddr, raddr)
+
+end
+function stats.ReceivedRetry(laddr, raddr)
+
+end
+function stats.ReceivedPacket(laddr, raddr)
+
+end
+function stats.BufferedPacket(laddr, raddr)
+
+end
+function stats.DroppedPacket(laddr, raddr)
+
+end
+function stats.UpdatedMetrics(laddr, raddr, rttStats, cwnd, bytesInFlight, packetsInFlight)
+   panapi.Log("UpdatedMetrics", cwnd, bytesInFlight, packetsInFlight)
+   panapi.Log("\n", tprint(rttStats, 1))
+end
+function stats.AcknowledgedPacket(laddr, raddr)
+
+end
+function stats.LostPacket(laddr, raddr)
+
+end
+function stats.UpdatedCongestionState(laddr, raddr)
+
+end
+function stats.UpdatedPTOCount(laddr, raddr)
+
+end
+function stats.UpdatedKeyFromTLS(laddr, raddr)
+
+end
+function stats.UpdatedKey(laddr, raddr)
+
+end
+function stats.DroppedEncryptionLevel(laddr, raddr)
+
+end
+function stats.DroppedKey(laddr, raddr)
+
+end
+function stats.SetLossTimer(laddr, raddr)
+
+end
+function stats.LossTimerExpired(laddr, raddr)
+
+end
+function stats.LossTimerCanceled(laddr, raddr)
+
+end
+function stats.Debug(laddr, raddr)
+
 end

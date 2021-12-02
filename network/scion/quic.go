@@ -77,10 +77,20 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 		log.Println(err)
 		return nil, err
 	}
+
+	id, ok := conn.Context().Value(quic.SessionTracingKey).(uint64)
+	if !ok {
+		log.Fatalln("cast failed")
+	} else {
+		log.Printf("FOUND QUIC TRACING KEY: %d", id)
+	}
+
 	stream, err := conn.OpenStream() //Sync(context.Background())
 	if err != nil {
 		log.Println(err)
 		return nil, err
+	} else {
+		log.Printf("STREAM: %v", stream.StreamID())
 	}
 	return network.NewQUIC(conn, stream, conn.LocalAddr(), conn.RemoteAddr()), nil
 }

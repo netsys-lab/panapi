@@ -1,9 +1,7 @@
 package rpc
 
 import (
-	//"fmt"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 
@@ -19,50 +17,54 @@ var (
 )
 
 type ServerSelector interface {
-	Initialize(pan.UDPAddr, pan.UDPAddr, []*pan.Path)
-	Path(pan.UDPAddr) *pan.Path
-	PathDown(pan.UDPAddr, pan.PathFingerprint, pan.PathInterface)
-	Refresh(pan.UDPAddr, []*pan.Path)
-	Close(pan.UDPAddr) error
+	Initialize(pan.UDPAddr, pan.UDPAddr, []*pan.Path) error
+	Path(pan.UDPAddr, pan.UDPAddr) (*pan.Path, error)
+	PathDown(pan.UDPAddr, pan.UDPAddr, pan.PathFingerprint, pan.PathInterface) error
+	Refresh(pan.UDPAddr, pan.UDPAddr, []*pan.Path) error
+	Close(pan.UDPAddr, pan.UDPAddr) error
 }
 
 type serverSelector struct {
-	fn        func(pan.UDPAddr) pan.Selector
+	fn        func(pan.UDPAddr, pan.UDPAddr) pan.Selector
 	selectors map[string]pan.Selector
 }
 
-func NewServerSelectorFunc(fn func(pan.UDPAddr) pan.Selector) ServerSelector {
+func NewServerSelectorFunc(fn func(pan.UDPAddr, pan.UDPAddr) pan.Selector) ServerSelector {
 	return serverSelector{fn, map[string]pan.Selector{}}
 }
 
-func (s *serverSelector) getSelector(raddr pan.UDPAddr) pan.Selector {
-	selector, ok := s.selectors[raddr.String()]
+func (s *serverSelector) getSelector(local, remote pan.UDPAddr) pan.Selector {
+	addr := local.String() + remote.String()
+	selector, ok := s.selectors[addr]
 	if !ok {
-		selector = s.fn(raddr)
-		s.selectors[raddr.String()] = selector
+		selector = s.fn(local, remote)
+		s.selectors[addr] = selector
 	}
 	return selector
 }
 
-func (s serverSelector) Path(raddr pan.UDPAddr) *pan.Path {
-	return s.getSelector(raddr).Path()
+func (s serverSelector) Path(local, remote pan.UDPAddr) (*pan.Path, error) {
+	return s.getSelector(local, remote).Path(), nil
 }
 
-func (s serverSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) {
-	s.getSelector(remote).Initialize(local, remote, paths)
+func (s serverSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) error {
+	s.getSelector(local, remote).Initialize(local, remote, paths)
+	return nil
 }
 
-func (s serverSelector) PathDown(raddr pan.UDPAddr, fp pan.PathFingerprint, pi pan.PathInterface) {
-	s.getSelector(raddr).PathDown(fp, pi)
+func (s serverSelector) PathDown(local, remote pan.UDPAddr, fp pan.PathFingerprint, pi pan.PathInterface) error {
+	s.getSelector(local, remote).PathDown(fp, pi)
+	return nil
 }
 
-func (s serverSelector) Refresh(remote pan.UDPAddr, paths []*pan.Path) {
-	s.getSelector(remote).Refresh(paths)
+func (s serverSelector) Refresh(local, remote pan.UDPAddr, paths []*pan.Path) error {
+	s.getSelector(local, remote).Refresh(paths)
+	return nil
 }
 
-func (s serverSelector) Close(raddr pan.UDPAddr) error {
-	err := s.getSelector(raddr).Close()
-	delete(s.selectors, raddr.String())
+func (s serverSelector) Close(local, remote pan.UDPAddr) error {
+	err := s.getSelector(local, remote).Close()
+	delete(s.selectors, local.String()+remote.String())
 	return err
 }
 
@@ -95,7 +97,7 @@ func NewSelectorServer(selector ServerSelector) *SelectorServer {
 }
 
 func (s *SelectorServer) Initialize(args, resp *SelectorMsg) error {
-	fmt.Println("Initialize invoked")
+	log.Println("Initialize invoked")
 	paths := make([]*pan.Path, len(args.Paths))
 	for i, p := range args.Paths {
 		paths[i] = p.PanPath()
@@ -104,21 +106,18 @@ func (s *SelectorServer) Initialize(args, resp *SelectorMsg) error {
 	if args.Local == nil || args.Remote == nil {
 		return ErrDeref
 	}
-	s.selector.Initialize(*args.Local, *args.Remote, paths)
-	msg := "Initialize done"
-	fmt.Println(msg)
-	return nil
+	return s.selector.Initialize(*args.Local, *args.Remote, paths)
 }
 
 func (s *SelectorServer) Path(args, resp *SelectorMsg) error {
 	if args.Remote == nil {
 		return ErrDeref
 	}
-	p := s.selector.Path(*args.Remote)
+	p, err := s.selector.Path(*args.Local, *args.Remote)
 	if p != nil {
 		resp.Fingerprint = &p.Fingerprint
 	}
-	return nil
+	return err
 }
 
 func (s *SelectorServer) PathDown(args, resp *SelectorMsg) error {
@@ -126,12 +125,11 @@ func (s *SelectorServer) PathDown(args, resp *SelectorMsg) error {
 	if args.Remote == nil || args.Fingerprint == nil || args.PathInterface == nil {
 		return ErrDeref
 	}
-	s.selector.PathDown(*args.Remote, *args.Fingerprint, *args.PathInterface)
-	return nil
+	return s.selector.PathDown(*args.Local, *args.Remote, *args.Fingerprint, *args.PathInterface)
 }
 
 func (s *SelectorServer) Refresh(args, resp *SelectorMsg) error {
-	fmt.Println("Refresh invoked")
+	log.Println("Refresh invoked")
 	paths := make([]*pan.Path, len(args.Paths))
 	for i, p := range args.Paths {
 		paths[i] = p.PanPath()
@@ -140,10 +138,7 @@ func (s *SelectorServer) Refresh(args, resp *SelectorMsg) error {
 	if args.Remote == nil {
 		return ErrDeref
 	}
-	s.selector.Refresh(*args.Remote, paths)
-	msg := "Refresh done"
-	fmt.Println(msg)
-	return nil
+	return s.selector.Refresh(*args.Local, *args.Remote, paths)
 }
 
 func (s *SelectorServer) Close(args, resp *SelectorMsg) error {
@@ -151,7 +146,7 @@ func (s *SelectorServer) Close(args, resp *SelectorMsg) error {
 	if args.Remote == nil {
 		return ErrDeref
 	}
-	return s.selector.Close(*args.Remote)
+	return s.selector.Close(*args.Local, *args.Remote)
 }
 
 type SelectorClient struct {
@@ -191,6 +186,7 @@ func (s *SelectorClient) Path() *pan.Path {
 	//s.l.Println("Path called")
 	msg := SelectorMsg{}
 	err := s.client.Call("SelectorServer.Path", &SelectorMsg{
+		Local:  s.local,
 		Remote: s.remote,
 	}, &msg)
 	if err != nil {
@@ -206,6 +202,7 @@ func (s *SelectorClient) PathDown(fp pan.PathFingerprint, pi pan.PathInterface) 
 	s.l.Println("PathDown called")
 	s.paths[fp] = nil // remove from local table
 	err := s.client.Call("SelectorServer.PathDown", &SelectorMsg{
+		Local:         s.local,
 		Remote:        s.remote,
 		Fingerprint:   &fp,
 		PathInterface: &pi,
@@ -224,6 +221,7 @@ func (s *SelectorClient) Refresh(paths []*pan.Path) {
 		ps[i] = NewPathFrom(p)
 	}
 	err := s.client.Call("SelectorServer.Refresh", &SelectorMsg{
+		Local:  s.local,
 		Remote: s.remote,
 		Paths:  ps,
 	}, &SelectorMsg{})
@@ -235,7 +233,7 @@ func (s *SelectorClient) Refresh(paths []*pan.Path) {
 
 func (s *SelectorClient) Close() error {
 	s.l.Println("Close called")
-	err := s.client.Call("SelectorServer.Close", &SelectorMsg{Remote: s.remote}, &SelectorMsg{})
+	err := s.client.Call("SelectorServer.Close", &SelectorMsg{Local: s.local, Remote: s.remote}, &SelectorMsg{})
 	if err != nil {
 		s.l.Println(err)
 		s.l.Println(s.client.client.Close())

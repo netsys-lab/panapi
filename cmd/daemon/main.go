@@ -57,7 +57,7 @@ func main() {
 	if err != nil {
 		log.Printf("Could not load path-selection script: %s", err)
 		log.Println("Falling back to default selector")
-		selector = rpc.NewServerSelectorFunc(func(pan.UDPAddr) pan.Selector {
+		selector = rpc.NewServerSelectorFunc(func(pan.UDPAddr, pan.UDPAddr) pan.Selector {
 			return &pan.DefaultSelector{}
 		})
 	}

@@ -141,12 +141,12 @@ func NewSelector(state *State) rpc.ServerSelector {
 
 	mod := map[string]lua.LGFunction{}
 	for _, fn := range []string{
-		"initialize",
-		"selectpath",
-		"pathdown",
-		"refresh",
-		"close",
-		"periodic",
+		"Initialize",
+		"Path",
+		"PathDown",
+		"Refresh",
+		"Close",
+		"Periodic",
 	} {
 		s := fmt.Sprintf("function %s not implemented in script", fn)
 		mod[fn] = func(L *lua.LState) int {
@@ -155,7 +155,7 @@ func NewSelector(state *State) rpc.ServerSelector {
 		}
 	}
 
-	mod["log"] = func(L *lua.LState) int {
+	mod["Log"] = func(L *lua.LState) int {
 		s := ""
 		for i := 1; i <= L.GetTop(); i++ {
 			s += L.Get(i).String() + " "
@@ -177,7 +177,7 @@ func NewSelector(state *State) rpc.ServerSelector {
 			s.CallByParam(
 				lua.P{
 					Protect: true,
-					Fn:      s.mod.RawGetString("periodic"),
+					Fn:      s.mod.RawGetString("Periodic"),
 					NRet:    0,
 				},
 				lua.LNumber(seconds),
@@ -189,7 +189,7 @@ func NewSelector(state *State) rpc.ServerSelector {
 	return s
 }
 
-func (s *LuaSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) {
+func (s *LuaSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) error {
 	s.Printf("Initialize(%s,%s,[%d]pan.Path)", local, remote, len(paths))
 	s.Lock()
 	defer s.Unlock()
@@ -202,24 +202,20 @@ func (s *LuaSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) {
 	//call the "setpaths" function in the Lua script
 	//with two arguments
 	//and don't expect a return value
-	err := s.CallByParam(
+	return s.CallByParam(
 		lua.P{
 			Protect: true,
-			Fn:      s.mod.RawGetString("initialize"),
+			Fn:      s.mod.RawGetString("Initialize"),
 			NRet:    0,
 		},
 		lua.LString(local.String()),
 		lua.LString(remote.String()),
 		lua_table_slice_to_table(lpaths),
 	)
-	if err != nil {
-		s.Fatal("Initialize", err)
-	}
 
 }
 
-func (s *LuaSelector) Path(raddr pan.UDPAddr) *pan.Path {
-	//log.Println("Path()")
+func (s *LuaSelector) Path(local, remote pan.UDPAddr) (*pan.Path, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -227,39 +223,40 @@ func (s *LuaSelector) Path(raddr pan.UDPAddr) *pan.Path {
 	//expect 1 return value
 	err := s.CallByParam(lua.P{
 		Protect: true,
-		Fn:      s.mod.RawGetString("selectpath"),
-		NRet:    1}, lua.LString(raddr.String()))
+		Fn:      s.mod.RawGetString("Path"),
+		NRet:    1},
+		lua.LString(local.String()),
+		lua.LString(remote.String()),
+	)
 	if err != nil {
-		s.Fatal("Path", err)
+		return nil, err
 	}
 	lt := s.ToTable(-1)
 	//pop element from the stack
 	s.Pop(1)
-	return s.state.get_pan_path(lt)
+	return s.state.get_pan_path(lt), nil
 }
 
-func (s *LuaSelector) PathDown(raddr pan.UDPAddr, fp pan.PathFingerprint, pi pan.PathInterface) {
+func (s *LuaSelector) PathDown(local, remote pan.UDPAddr, fp pan.PathFingerprint, pi pan.PathInterface) error {
 	//s.l.Println("PathDown()")
 	s.Lock()
 	defer s.Unlock()
-	err := s.CallByParam(
+	s.Printf("PathDown called with fp %v and pi %v", fp, pi)
+	return s.CallByParam(
 		lua.P{
-			Fn:      s.mod.RawGetString("pathdown"),
+			Fn:      s.mod.RawGetString("PathDown"),
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LString(raddr.String()),
+		lua.LString(local.String()),
+		lua.LString(remote.String()),
 		lua.LString(fp),
 		new_lua_path_interface(pi),
 	)
-	s.Printf("PathDown called with fp %v and pi %v: %s", fp, pi, err)
-	if err != nil {
-		s.Fatal(err)
-	}
 
 }
 
-func (s *LuaSelector) Refresh(remote pan.UDPAddr, paths []*pan.Path) {
+func (s *LuaSelector) Refresh(local, remote pan.UDPAddr, paths []*pan.Path) error {
 	s.Println("Refresh()")
 	s.Lock()
 	defer s.Unlock()
@@ -272,21 +269,19 @@ func (s *LuaSelector) Refresh(remote pan.UDPAddr, paths []*pan.Path) {
 	//call the "setpaths" function in the Lua script
 	//with two arguments
 	//and don't expect a return value
-	err := s.CallByParam(
+	return s.CallByParam(
 		lua.P{
 			Protect: true,
-			Fn:      s.mod.RawGetString("refresh"),
+			Fn:      s.mod.RawGetString("Refresh"),
 			NRet:    0,
 		},
+		lua.LString(local.String()),
 		lua.LString(remote.String()),
 		lua_table_slice_to_table(lpaths),
 	)
-	if err != nil {
-		s.Fatal("refresh", err)
-	}
 }
 
-func (s *LuaSelector) Close(raddr pan.UDPAddr) error {
+func (s *LuaSelector) Close(local, remote pan.UDPAddr) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -295,10 +290,12 @@ func (s *LuaSelector) Close(raddr pan.UDPAddr) error {
 	err := s.CallByParam(
 		lua.P{
 			Protect: true,
-			Fn:      s.mod.RawGetString("close"),
+			Fn:      s.mod.RawGetString("Close"),
 			NRet:    1,
 		},
-		lua.LString(raddr.String()))
+		lua.LString(local.String()),
+		lua.LString(remote.String()),
+	)
 
 	log.Println("Close called on LuaSelector:", err)
 	//s.L.Close()

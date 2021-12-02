@@ -2,10 +2,10 @@ package lua
 
 import (
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/lucas-clemente/quic-go/logging"
+	"github.com/netsec-ethz/scion-apps/pkg/pan"
 	"github.com/netsys-lab/panapi/rpc"
 	lua "github.com/yuin/gopher-lua"
 )
@@ -99,9 +99,9 @@ func NewStats(state *State) rpc.ServerConnectionTracer {
 		"LossTimerCanceled",
 		"Debug",
 	} {
-		s := fmt.Sprintf("function %s not implemented in script", fn)
+		//s := fmt.Sprintf("function %s not implemented in script", fn)
 		mod[fn] = func(L *lua.LState) int {
-			state.Logger.Println(s)
+			//state.Logger.Println(s)
 			return 0
 		}
 	}
@@ -110,7 +110,7 @@ func NewStats(state *State) rpc.ServerConnectionTracer {
 	return &Stats{state, stats}
 }
 
-func (s *Stats) TracerForConnection(tracing_id uint64, p logging.Perspective, odcid logging.ConnectionID) error {
+func (s *Stats) TracerForConnection(tracer_id uint64, p logging.Perspective, odcid logging.ConnectionID) error {
 	s.Printf("TracerForConnection")
 	s.Lock()
 	defer s.Unlock()
@@ -120,12 +120,12 @@ func (s *Stats) TracerForConnection(tracing_id uint64, p logging.Perspective, od
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		lua.LNumber(tracer_id),
 		lua.LNumber(p),
 		strhlpr(odcid),
 	)
 }
-func (s *Stats) StartedConnection(tracing_id uint64, local, remote net.Addr, srcConnID, destConnID logging.ConnectionID) error {
+func (s *Stats) StartedConnection(local, remote *pan.UDPAddr, srcConnID, destConnID logging.ConnectionID) error {
 	s.Printf("StartedConnection")
 	s.Lock()
 	defer s.Unlock()
@@ -135,7 +135,6 @@ func (s *Stats) StartedConnection(tracing_id uint64, local, remote net.Addr, src
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
 		strhlpr(local),
 		strhlpr(remote),
 		strhlpr(srcConnID),
@@ -143,7 +142,7 @@ func (s *Stats) StartedConnection(tracing_id uint64, local, remote net.Addr, src
 	)
 
 }
-func (s *Stats) NegotiatedVersion(tracing_id uint64, chosen logging.VersionNumber, clientVersions, serverVersions []logging.VersionNumber) error {
+func (s *Stats) NegotiatedVersion(local, remote *pan.UDPAddr, chosen logging.VersionNumber, clientVersions, serverVersions []logging.VersionNumber) error {
 	s.Printf("NegotiatedVersion")
 	s.Lock()
 	defer s.Unlock()
@@ -164,14 +163,14 @@ func (s *Stats) NegotiatedVersion(tracing_id uint64, chosen logging.VersionNumbe
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		strhlpr(chosen),
 		&c_vs,
 		&s_vs,
 	)
 
 }
-func (s *Stats) ClosedConnection(tracing_id uint64, err error) error {
+func (s *Stats) ClosedConnection(local, remote *pan.UDPAddr, err error) error {
 	s.Printf("ClosedConnection")
 	s.Lock()
 	defer s.Unlock()
@@ -181,12 +180,12 @@ func (s *Stats) ClosedConnection(tracing_id uint64, err error) error {
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		lua.LString(err.Error()),
 	)
 
 }
-func (s *Stats) SentTransportParameters(tracing_id uint64, parameters *logging.TransportParameters) error {
+func (s *Stats) SentTransportParameters(local, remote *pan.UDPAddr, parameters *logging.TransportParameters) error {
 	s.Printf("SentTransportParameters")
 	s.Lock()
 	defer s.Unlock()
@@ -196,12 +195,12 @@ func (s *Stats) SentTransportParameters(tracing_id uint64, parameters *logging.T
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		new_lua_parameters(parameters),
 	)
 
 }
-func (s *Stats) ReceivedTransportParameters(tracing_id uint64, parameters *logging.TransportParameters) error {
+func (s *Stats) ReceivedTransportParameters(local, remote *pan.UDPAddr, parameters *logging.TransportParameters) error {
 	s.Printf("ReceivedTransportParameters")
 	s.Lock()
 	defer s.Unlock()
@@ -211,12 +210,12 @@ func (s *Stats) ReceivedTransportParameters(tracing_id uint64, parameters *loggi
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		new_lua_parameters(parameters),
 	)
 
 }
-func (s *Stats) RestoredTransportParameters(tracing_id uint64, parameters *logging.TransportParameters) error {
+func (s *Stats) RestoredTransportParameters(local, remote *pan.UDPAddr, parameters *logging.TransportParameters) error {
 	s.Printf("RestoredTransportParameters")
 	s.Lock()
 	defer s.Unlock()
@@ -226,12 +225,12 @@ func (s *Stats) RestoredTransportParameters(tracing_id uint64, parameters *loggi
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		new_lua_parameters(parameters),
 	)
 
 }
-func (s *Stats) SentPacket(tracing_id uint64, hdr *logging.ExtendedHeader, size logging.ByteCount, ack *logging.AckFrame, frames []logging.Frame) error {
+func (s *Stats) SentPacket(local, remote *pan.UDPAddr, hdr *logging.ExtendedHeader, size logging.ByteCount, ack *logging.AckFrame, frames []logging.Frame) error {
 	s.Printf("SentPacket: only stub implementation")
 	s.Lock()
 	defer s.Unlock()
@@ -241,11 +240,11 @@ func (s *Stats) SentPacket(tracing_id uint64, hdr *logging.ExtendedHeader, size 
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 	)
 
 }
-func (s *Stats) ReceivedVersionNegotiationPacket(tracing_id uint64, hdr *logging.Header, versions []logging.VersionNumber) error {
+func (s *Stats) ReceivedVersionNegotiationPacket(local, remote *pan.UDPAddr, hdr *logging.Header, versions []logging.VersionNumber) error {
 	s.Printf("ReceivedVersionNegotiationPacket: only stub implementation")
 	s.Lock()
 	defer s.Unlock()
@@ -260,12 +259,12 @@ func (s *Stats) ReceivedVersionNegotiationPacket(tracing_id uint64, hdr *logging
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		vs,
 	)
 
 }
-func (s *Stats) ReceivedRetry(tracing_id uint64, hdr *logging.Header) error {
+func (s *Stats) ReceivedRetry(local, remote *pan.UDPAddr, hdr *logging.Header) error {
 	s.Printf("ReceivedRetry: only stub implementation")
 	s.Lock()
 	defer s.Unlock()
@@ -275,11 +274,11 @@ func (s *Stats) ReceivedRetry(tracing_id uint64, hdr *logging.Header) error {
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 	)
 
 }
-func (s *Stats) ReceivedPacket(tracing_id uint64, hdr *logging.ExtendedHeader, size logging.ByteCount, frames []logging.Frame) error {
+func (s *Stats) ReceivedPacket(local, remote *pan.UDPAddr, hdr *logging.ExtendedHeader, size logging.ByteCount, frames []logging.Frame) error {
 	s.Printf("ReceivedPacket: only stub implementation")
 	s.Lock()
 	defer s.Unlock()
@@ -289,11 +288,11 @@ func (s *Stats) ReceivedPacket(tracing_id uint64, hdr *logging.ExtendedHeader, s
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 	)
 
 }
-func (s *Stats) BufferedPacket(tracing_id uint64, ptype logging.PacketType) error {
+func (s *Stats) BufferedPacket(local, remote *pan.UDPAddr, ptype logging.PacketType) error {
 	s.Printf("BufferedPacket")
 	s.Lock()
 	defer s.Unlock()
@@ -303,12 +302,12 @@ func (s *Stats) BufferedPacket(tracing_id uint64, ptype logging.PacketType) erro
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		lua.LNumber(ptype),
 	)
 
 }
-func (s *Stats) DroppedPacket(tracing_id uint64, ptype logging.PacketType, size logging.ByteCount, reason logging.PacketDropReason) error {
+func (s *Stats) DroppedPacket(local, remote *pan.UDPAddr, ptype logging.PacketType, size logging.ByteCount, reason logging.PacketDropReason) error {
 	s.Printf("DroppedPacket")
 	s.Lock()
 	defer s.Unlock()
@@ -318,14 +317,14 @@ func (s *Stats) DroppedPacket(tracing_id uint64, ptype logging.PacketType, size 
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		lua.LNumber(ptype),
 		lua.LNumber(size),
 		lua.LNumber(reason),
 	)
 
 }
-func (s *Stats) UpdatedMetrics(tracing_id uint64, rttStats *rpc.RTTStats, cwnd, bytesInFlight logging.ByteCount, packetsInFlight int) error {
+func (s *Stats) UpdatedMetrics(local, remote *pan.UDPAddr, rttStats *rpc.RTTStats, cwnd, bytesInFlight logging.ByteCount, packetsInFlight int) error {
 	s.Printf("UpdatedMetrics")
 	s.Lock()
 	defer s.Unlock()
@@ -335,7 +334,7 @@ func (s *Stats) UpdatedMetrics(tracing_id uint64, rttStats *rpc.RTTStats, cwnd, 
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		new_lua_rtt_stats(rttStats),
 		lua.LNumber(cwnd),
 		lua.LNumber(bytesInFlight),
@@ -343,7 +342,7 @@ func (s *Stats) UpdatedMetrics(tracing_id uint64, rttStats *rpc.RTTStats, cwnd, 
 	)
 
 }
-func (s *Stats) AcknowledgedPacket(tracing_id uint64, level logging.EncryptionLevel, num logging.PacketNumber) error {
+func (s *Stats) AcknowledgedPacket(local, remote *pan.UDPAddr, level logging.EncryptionLevel, num logging.PacketNumber) error {
 	s.Printf("AcknowledgedPacket")
 	s.Lock()
 	defer s.Unlock()
@@ -353,13 +352,13 @@ func (s *Stats) AcknowledgedPacket(tracing_id uint64, level logging.EncryptionLe
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		strhlpr(level),
 		lua.LNumber(num),
 	)
 
 }
-func (s *Stats) LostPacket(tracing_id uint64, level logging.EncryptionLevel, num logging.PacketNumber, reason logging.PacketLossReason) error {
+func (s *Stats) LostPacket(local, remote *pan.UDPAddr, level logging.EncryptionLevel, num logging.PacketNumber, reason logging.PacketLossReason) error {
 	s.Printf("LostPacket")
 	s.Lock()
 	defer s.Unlock()
@@ -369,14 +368,14 @@ func (s *Stats) LostPacket(tracing_id uint64, level logging.EncryptionLevel, num
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		strhlpr(level),
 		lua.LNumber(num),
 		lua.LNumber(reason),
 	)
 
 }
-func (s *Stats) UpdatedCongestionState(tracing_id uint64, state logging.CongestionState) error {
+func (s *Stats) UpdatedCongestionState(local, remote *pan.UDPAddr, state logging.CongestionState) error {
 	s.Printf("UpdatedCongestionState")
 	s.Lock()
 	defer s.Unlock()
@@ -386,12 +385,12 @@ func (s *Stats) UpdatedCongestionState(tracing_id uint64, state logging.Congesti
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		lua.LNumber(state),
 	)
 
 }
-func (s *Stats) UpdatedPTOCount(tracing_id uint64, value uint32) error {
+func (s *Stats) UpdatedPTOCount(local, remote *pan.UDPAddr, value uint32) error {
 	s.Printf("UpdatedPTOCount")
 	s.Lock()
 	defer s.Unlock()
@@ -401,12 +400,12 @@ func (s *Stats) UpdatedPTOCount(tracing_id uint64, value uint32) error {
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		lua.LNumber(value),
 	)
 
 }
-func (s *Stats) UpdatedKeyFromTLS(tracing_id uint64, level logging.EncryptionLevel, p logging.Perspective) error {
+func (s *Stats) UpdatedKeyFromTLS(local, remote *pan.UDPAddr, level logging.EncryptionLevel, p logging.Perspective) error {
 	s.Printf("UpdatedKeyFromTLS")
 	s.Lock()
 	defer s.Unlock()
@@ -416,13 +415,13 @@ func (s *Stats) UpdatedKeyFromTLS(tracing_id uint64, level logging.EncryptionLev
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		strhlpr(level),
 		lua.LNumber(p),
 	)
 
 }
-func (s *Stats) UpdatedKey(tracing_id uint64, generation logging.KeyPhase, remote bool) error {
+func (s *Stats) UpdatedKey(local, remote *pan.UDPAddr, generation logging.KeyPhase, rmte bool) error {
 	s.Printf("UpdatedKey")
 	s.Lock()
 	defer s.Unlock()
@@ -432,13 +431,13 @@ func (s *Stats) UpdatedKey(tracing_id uint64, generation logging.KeyPhase, remot
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		lua.LNumber(generation),
-		lua.LBool(remote),
+		lua.LBool(rmte),
 	)
 
 }
-func (s *Stats) DroppedEncryptionLevel(tracing_id uint64, level logging.EncryptionLevel) error {
+func (s *Stats) DroppedEncryptionLevel(local, remote *pan.UDPAddr, level logging.EncryptionLevel) error {
 	s.Printf("DroppedEncryptionLevel")
 	s.Lock()
 	defer s.Unlock()
@@ -448,12 +447,12 @@ func (s *Stats) DroppedEncryptionLevel(tracing_id uint64, level logging.Encrypti
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		strhlpr(level),
 	)
 
 }
-func (s *Stats) DroppedKey(tracing_id uint64, generation logging.KeyPhase) error {
+func (s *Stats) DroppedKey(local, remote *pan.UDPAddr, generation logging.KeyPhase) error {
 	s.Printf("DroppedKey")
 	s.Lock()
 	defer s.Unlock()
@@ -463,12 +462,12 @@ func (s *Stats) DroppedKey(tracing_id uint64, generation logging.KeyPhase) error
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		lua.LNumber(generation),
 	)
 
 }
-func (s *Stats) SetLossTimer(tracing_id uint64, ttype logging.TimerType, level logging.EncryptionLevel, t time.Time) error {
+func (s *Stats) SetLossTimer(local, remote *pan.UDPAddr, ttype logging.TimerType, level logging.EncryptionLevel, t time.Time) error {
 	s.Printf("SetLossTimer")
 	s.Lock()
 	defer s.Unlock()
@@ -478,14 +477,14 @@ func (s *Stats) SetLossTimer(tracing_id uint64, ttype logging.TimerType, level l
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		lua.LNumber(ttype),
 		strhlpr(level),
 		strhlpr(t),
 	)
 
 }
-func (s *Stats) LossTimerExpired(tracing_id uint64, ttype logging.TimerType, level logging.EncryptionLevel) error {
+func (s *Stats) LossTimerExpired(local, remote *pan.UDPAddr, ttype logging.TimerType, level logging.EncryptionLevel) error {
 	s.Printf("LossTimerExpired")
 	s.Lock()
 	defer s.Unlock()
@@ -495,13 +494,13 @@ func (s *Stats) LossTimerExpired(tracing_id uint64, ttype logging.TimerType, lev
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		lua.LNumber(ttype),
 		strhlpr(level),
 	)
 
 }
-func (s *Stats) LossTimerCanceled(tracing_id uint64) error {
+func (s *Stats) LossTimerCanceled(local, remote *pan.UDPAddr) error {
 	s.Printf("LossTimerCanceled")
 	s.Lock()
 	defer s.Unlock()
@@ -511,11 +510,11 @@ func (s *Stats) LossTimerCanceled(tracing_id uint64) error {
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 	)
 
 }
-func (s *Stats) Close(tracing_id uint64) error {
+func (s *Stats) Close(local, remote *pan.UDPAddr) error {
 	s.Printf("Close")
 	s.Lock()
 	defer s.Unlock()
@@ -525,11 +524,11 @@ func (s *Stats) Close(tracing_id uint64) error {
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 	)
 
 }
-func (s *Stats) Debug(tracing_id uint64, name, msg string) error {
+func (s *Stats) Debug(local, remote *pan.UDPAddr, name, msg string) error {
 	s.Printf("Debug")
 	s.Lock()
 	defer s.Unlock()
@@ -539,7 +538,7 @@ func (s *Stats) Debug(tracing_id uint64, name, msg string) error {
 			NRet:    0,
 			Protect: true,
 		},
-		lua.LNumber(tracing_id),
+		strhlpr(local), strhlpr(remote),
 		lua.LString(name),
 		lua.LString(msg),
 	)
