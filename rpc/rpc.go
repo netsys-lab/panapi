@@ -82,6 +82,7 @@ func NewClient(conn io.ReadWriteCloser) (*Client, error) {
 }
 
 func (c *Client) Call(serviceMethod string, args interface{}, reply interface{}) error {
+	c.l.Printf("RPC: %s called", serviceMethod)
 	return c.client.Call(serviceMethod, args, reply)
 }
 

@@ -1,6 +1,7 @@
 package lua
 
 import (
+	//"io/ioutil"
 	"log"
 	"os"
 	"sync"
@@ -16,8 +17,9 @@ type State struct {
 
 func NewState() *State {
 	L := lua.NewState()
+	//l := log.New(ioutil.Discard, "lua ", log.Ltime)
 	l := log.Default()
-	l.SetFlags(log.Ltime)
+	l.SetFlags(log.Ltime | log.Lshortfile)
 	l.SetPrefix("lua ")
 	return &State{L, sync.Mutex{}, l}
 }

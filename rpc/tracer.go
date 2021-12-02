@@ -28,22 +28,7 @@ func (c TracerClient) TracerForConnection(ctx context.Context, p logging.Perspec
 		c.l.Fatalln("cast failed")
 	}
 	c.l.Printf("TracerForConnection %d %d", p, id)
-	/*err := c.rpc.Call(
-		"TracerServer.TracerForConnection",
-		&TracerMsg{
-			//Context:      ctx
-			ID:           &c.rpc.id,
-			TracingID:    &id,
-			Perspective:  &p,
-			ConnectionID: &odcid,
-		},
-		&TracerMsg{},
-	)
-	if err != nil {
-		c.l.Println(err)
-	}*/
 	return NewConnectionTracerClient(c.rpc, id, p, odcid)
-	//return nil
 }
 
 func (c TracerClient) SentPacket(addr net.Addr, hdr *logging.Header, n logging.ByteCount, fs []logging.Frame) {
