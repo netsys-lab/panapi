@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/netsec-ethz/scion-apps/pkg/appnet"
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/daemon"
 	"github.com/scionproto/scion/go/lib/snet"
@@ -35,29 +34,6 @@ func DefNetwork() *Network {
 	return &defNetwork
 }
 
-func Dial(address string) (*snet.Conn, error) {
-	raddr, err := appnet.ResolveUDPAddr(address)
-	if err != nil {
-		return nil, err
-	}
-	return DialAddr(raddr)
-}
-
-func DialAddr(raddr *snet.UDPAddr) (*snet.Conn, error) {
-	if raddr.Path.IsEmpty() {
-		err := appnet.SetDefaultPath(raddr)
-		if err != nil {
-			return nil, err
-		}
-	}
-	localIP, err := resolveLocal(raddr)
-	if err != nil {
-		return nil, err
-	}
-	laddr := &net.UDPAddr{IP: localIP}
-	return DefNetwork().Dial(context.Background(), "udp", laddr, raddr, addr.SvcNone)
-}
-
 func Listen(listen *net.UDPAddr) (*snet.Conn, error) {
 	if listen == nil {
 		listen = &net.UDPAddr{}
@@ -79,14 +55,6 @@ func Listen(listen *net.UDPAddr) (*snet.Conn, error) {
 
 func ListenPort(port uint16) (*snet.Conn, error) {
 	return Listen(&net.UDPAddr{Port: int(port)})
-}
-
-func resolveLocal(raddr *snet.UDPAddr) (net.IP, error) {
-	if raddr.NextHop != nil {
-		nextHop := raddr.NextHop.IP
-		return addrutil.ResolveLocal(nextHop)
-	}
-	return defaultLocalIP()
 }
 
 func defaultLocalIP() (net.IP, error) {

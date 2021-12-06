@@ -2,10 +2,10 @@ package scion
 
 import (
 	"context"
-	"net"
 
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 	"github.com/netsys-lab/panapi/network"
+	"inet.af/netaddr"
 )
 
 type UDPDialer struct {
@@ -18,7 +18,7 @@ func NewUDPDialer(address string) (*UDPDialer, error) {
 }
 
 func (d *UDPDialer) Dial() (network.Connection, error) {
-	conn, err := pan.DialUDP(context.Background(), nil, d.raddr, nil, nil)
+	conn, err := pan.DialUDP(context.Background(), netaddr.IPPort{}, d.raddr, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -26,7 +26,7 @@ func (d *UDPDialer) Dial() (network.Connection, error) {
 }
 
 type UDPListener struct {
-	laddr net.UDPAddr
+	laddr netaddr.IPPort
 }
 
 func NewUDPListener(address string) (*UDPListener, error) {
@@ -34,11 +34,11 @@ func NewUDPListener(address string) (*UDPListener, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &UDPListener{net.UDPAddr{Port: addr.Port}}, nil
+	return &UDPListener{netaddr.IPPortFrom(addr.IP, addr.Port)}, nil
 }
 
 func (l *UDPListener) Listen() (network.Connection, error) {
-	pconn, err := pan.ListenUDP(context.Background(), &l.laddr, nil)
+	pconn, err := pan.ListenUDP(context.Background(), l.laddr, nil)
 	if err != nil {
 		return &network.UDP{}, err
 	}

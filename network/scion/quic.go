@@ -9,6 +9,7 @@ import (
 
 	"github.com/lucas-clemente/quic-go"
 	"github.com/lucas-clemente/quic-go/logging"
+	"inet.af/netaddr"
 
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 	"github.com/netsec-ethz/scion-apps/pkg/quicutil"
@@ -71,7 +72,7 @@ func (d *QUICDialer) Dial() (network.Connection, error) {
 		tracer = rpc.NewTracerClient(d.client)
 	}
 
-	conn, err := pan.DialQUIC(context.Background(), nil, d.raddr, nil, d.selector, "", tlsConf, &quic.Config{Tracer: tracer})
+	conn, err := pan.DialQUIC(context.Background(), netaddr.IPPort{}, d.raddr, nil, d.selector, "", tlsConf, &quic.Config{Tracer: tracer})
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -118,7 +119,7 @@ func NewQUICListener(address string, tp *network.TransportProperties) (*QUICList
 		}
 	}
 
-	listener, err := pan.ListenQUIC(context.Background(), &net.UDPAddr{Port: addr.Port}, nil, tlsConf, &quic.Config{
+	listener, err := pan.ListenQUIC(context.Background(), netaddr.IPPortFrom(addr.IP, addr.Port), nil, tlsConf, &quic.Config{
 		Tracer: tracer,
 	})
 	if err != nil {

@@ -6,7 +6,7 @@ require (
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d
 	github.com/fatih/color v1.9.0
 	github.com/lucas-clemente/quic-go v0.24.0
-	github.com/netsec-ethz/scion-apps v0.4.0
+	github.com/netsec-ethz/scion-apps v0.4.1-0.20211203140009-c26494e4652f
 	github.com/scionproto/scion v0.6.1-0.20210929154253-764d6e2afe47
 	github.com/urfave/cli/v2 v2.3.0
 	github.com/yuin/gopher-lua v0.0.0-20210529063254-f4c35e4016d9
@@ -14,7 +14,6 @@ require (
 
 require (
 	github.com/antlr/antlr4 v0.0.0-20181218183524-be58ebffde8e // indirect
-	github.com/bclicn/color v0.0.0-20180711051946-108f2023dc84 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/britram/borat v0.0.0-20181011130314-f891bcfcfb9b // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
@@ -53,6 +52,8 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.17.0 // indirect
+	go4.org/intern v0.0.0-20210108033219-3eb7198706b2 // indirect
+	go4.org/unsafe/assume-no-moving-gc v0.0.0-20201222180813-1025295fd063 // indirect
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2 // indirect
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20210805182204-aaa1db679c0d // indirect
@@ -66,10 +67,9 @@ require (
 	google.golang.org/protobuf v1.26.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	inet.af/netaddr v0.0.0-20210903134321-85fa6c94624e // indirect
 )
 
-replace (
-	github.com/netsec-ethz/scion-apps => github.com/netsys-lab/scion-apps v0.1.1-0.20211123104651-c26619ae9982
-	//github.com/netsec-ethz/scion-apps => github.com/netsys-lab/scion-apps v0.1.1-0.20211104195016-a09c318e9786
-	github.com/scionproto/scion => github.com/netsec-ethz/scion v0.0.0-20211005155700-e5719e3cd5ed
-)
+//github.com/netsec-ethz/scion-apps => github.com/netsys-lab/scion-apps v0.1.1-0.20211123104651-c26619ae9982
+//github.com/netsec-ethz/scion-apps => github.com/netsys-lab/scion-apps v0.1.1-0.20211104195016-a09c318e9786
+replace github.com/scionproto/scion => github.com/netsec-ethz/scion v0.0.0-20211005155700-e5719e3cd5ed
