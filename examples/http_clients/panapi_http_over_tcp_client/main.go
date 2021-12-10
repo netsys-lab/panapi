@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/textproto"
 
 	"github.com/netsys-lab/panapi"
 	"github.com/netsys-lab/panapi/network"
@@ -26,17 +27,22 @@ func runClient() error {
 
 	defer Connection.Close()
 
-	toSend := network.NewFixedMessageString("GET / HTTP/1.0\r\n\r\n")
-	toSend.Header.Add("content-type", "text")
-	err = toSend.AddMIMEHeaderToMesaage()
+	toSend := network.NewFixedMessageString("This is my message body which is made of text")
+	header := make(textproto.MIMEHeader)
+	header.Add("content-type", "text")
+	toSend.SetHeader(&header)
+	toSend.ToHTTPMessage()
 	fcheck(err)
 	Connection.Send(toSend)
 
 	response := network.NewFixedMessage(1024)
 	err = Connection.Receive(response)
 	fcheck(err)
+	responseHeader, err := response.GetHeader()
+	fcheck(err)
 
 	log.Printf("Message: %s", response)
+	log.Printf("Message: %s", responseHeader)
 
 	return nil
 

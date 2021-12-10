@@ -3,12 +3,14 @@ package network
 import (
 	"io"
 	"net"
+	"net/textproto"
 )
 
 type Message interface {
 	String() string
 	io.ReadWriter
-	AddMIMEHeaderToMesaage() error
+	SetHeader(header *textproto.MIMEHeader)
+	GetHeader() (*textproto.MIMEHeader, error)
 }
 
 type Connection interface {
