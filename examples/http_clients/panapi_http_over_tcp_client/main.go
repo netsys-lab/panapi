@@ -31,18 +31,19 @@ func runClient() error {
 	header := make(textproto.MIMEHeader)
 	header.Add("content-type", "text")
 	toSend.SetHeader(&header)
-	toSend.ToHTTPMessage()
+	toSend.SetHttpHeader([]byte("GET / HTTP/1.0\r\n"))
 	fcheck(err)
 	Connection.Send(toSend)
 
 	response := network.NewFixedMessage(1024)
 	err = Connection.Receive(response)
 	fcheck(err)
-	responseHeader, err := response.GetHeader()
-	fcheck(err)
+	responseHeader := response.GetHeader()
+	responseHttpHeader := response.GetHttpHeader()
 
-	log.Printf("Message: %s", response)
-	log.Printf("Message: %s", responseHeader)
+	log.Printf("Entire Message: %s", response)
+	log.Printf("Just Header: %s", responseHeader)
+	log.Printf("Just Http Header: %s", responseHttpHeader)
 
 	return nil
 

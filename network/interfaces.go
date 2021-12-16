@@ -10,7 +10,7 @@ type Message interface {
 	String() string
 	io.ReadWriter
 	SetHeader(header *textproto.MIMEHeader)
-	GetHeader() (*textproto.MIMEHeader, error)
+	GetHeader() *textproto.MIMEHeader
 }
 
 type Connection interface {
