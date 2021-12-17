@@ -48,7 +48,7 @@ Preconnection := panapi.NewPreconnection(LocalSpecifier,
                                   SecurityParameters)
 ```
 
-
+Per https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#name-transport-property-names, this way is preferred, at least for `TransportProperties`.
 
 ### Option 2: Constants
 ```Go
@@ -93,6 +93,11 @@ SecurityParameters := panapi.SecurityParameters{
     Identity: myIdentity,
     PrivateKey: myPrivateKey,
     PublicKey: myPublicKey,
+    //KeyPair: panapi.KeyPair{
+    //    PrivateKey: myPrivateKey,
+    //    PublicKey: myPublicKey,
+    //},
+        
 }
 
 // Specifying a Remote Endpoint is optional when using Listen()
@@ -127,49 +132,13 @@ Listener.Stop()
 
 Again, there are numerous ways to do this in Go.
 
-### Option 1: Heavy use of Go channels for events
-
-This would associate each different type of possible event parameter to its own channel.
-
-```Go
-Listener := Preconnection.Listen()
-
-//---- Loop to handle multiple connections begin ----
-
-// New connections are sent on the "ConnectionReceived" channel provided by Listener
-// (Execution blocks, until a Connection is received)
-Connection := <- Listener.ConnectionReceived
-
-//---- Go-routine for asynchronous handling of a received connection begin ----
-go func(connection panapi.Connection) {
-
-    // Calling "Receive()" on a Connection indicates our desire to
-    // later read a complete messages from the "Received" channel.
-    // (Nonblocking)
-    connection.Receive()
-
-    // Block, until a complete message is received
-    // (Message is a struct containing the fields "Request", "Context", etc)
-    Message := <- connection.Received
-
-    // Process message
-
-    connection.Send(messageDataResponse)
-    connection.Close()
-}(Connection)
-//---- Go-routine end ----
-
-//---- Loop end ----
-
-Listener.Stop()
-```
-
-### Option 2: Use callback handlers
+### Option 0: Just use callback handlers
 
 ```Go
 Listener := Preconnection.Listen()
 
 // the inner callback gets executed, when a complete message is available
+// Issue here is that we don't have access to "conn" before having read a complete msg
 Listener.ReceiveFunc(func(conn panapi.Connection, msg panapi.Message) {
     messageDataRequest, messageContext := msg.Request, msg.Context
     ...
@@ -179,4 +148,121 @@ Listener.ReceiveFunc(func(conn panapi.Connection, msg panapi.Message) {
 
 Listener.Stop()
 ```
+
+
+### Option 1: Heavy use of Go channels for events
+
+This would associate each different type of possible event parameter to its own channel.
+
+
+```Go
+Listener := Preconnection.Listen()
+
+// New connections are sent on the "ConnectionReceived" channel provided by Listener
+// (Execution blocks, until a Connection is received)
+Connection := <- Listener.ConnectionReceived
+
+// Calling "Receive()" on a Connection indicates our desire to
+// later read a complete messages from the "Received" channel.
+// (Nonblocking)
+Connection.Receive()
+
+// Block, until a complete message is received
+// (Message is a struct containing the fields "Request", "Context", etc)
+Message := <- Connection.Received
+
+// Process message
+
+Connection.Send(messageDataResponse)
+Connection.Close()
+
+Listener.Stop()
+```
+
+#### Idiomatic Go
+
+This is how the above would look in practice in "more idiomatic Go", including server loop and go routine dispatch
+
+```Go
+import (
+    // we pretend that "helper" implements all the irrelevant stuff
+    "internal/helper" 
+    "github.com/netsys-lab/panapi"
+    // explicitly load the https service
+    "github.com/netsys-lab/panapi/service/https"
+)
+
+
+// Asynchronous message handler function
+func HandleMessage(connection panapi.Connection) {
+    // Calling "Receive()" on a Connection indicates our desire to
+    // later read a complete messages from the "Received" channel.
+    // (Nonblocking)
+    connection.Receive()
+
+    // Block, until a complete message is received
+    // (message is a struct containing the fields "Request", "Context", etc)
+    message := <- connection.Received
+
+    messageDataRequest, messageContext := message.Request, message.Context
+    // Process message
+    messageDataResponse := helper.Answer(messageDataRequest, messageContext)
+
+    connection.Send(messageDataResponse)
+    connection.Close()
+}
+
+func main() {
+    // boilerplate
+    myPublicKey, myPrivateKey := helper.LoadKeys()
+    myIdentity := helper.LoadIdentity()
+
+    LocalSpecifier := panapi.NewLocalEndpoint()
+    // all possible interfaces, equivalent to "any" 
+    LocalSpecifier.WithInterface(panapi.NetworkInterfaces())
+    LocalSpecifier.WithService(https.NewService())
+
+    TransportProperties := panapi.NewTransportProperties()
+    TransportProperties.Require("preserve-msg-boundaries")
+
+    SecurityParameters := panapi.SecurityParameters{
+        Identity: myIdentity,
+        KeyPair: panapi.KeyPair{
+            PrivateKey: myPrivateKey,
+            PublicKey: myPublicKey,
+        },
+    }
+
+    // Specifying a Remote Endpoint is optional when using Listen()
+    Preconnection := panapi.NewPreconnection(
+        LocalSpecifier,
+        nil,
+        TransportProperties,
+        SecurityParameters,
+    )
+
+
+    Listener := Preconnection.Listen()
+
+
+    //---- Loop to handle multiple connections begin ----
+    for {
+        // Wait for available data (i.e., "events") on any channel
+        select {
+        // New connections are sent on the "ConnectionReceived" channel provided by Listener
+        case Connection := <- Listener.ConnectionReceived:
+            // Asynchronously call Message handler
+            // (does not block)
+            go HandleMessage(Connection)
+        case Error := <- Listener.EstablishmentError:
+            // Handle Error
+            fmt.Println(Error)
+        }
+    }
+    //---- Loop end ----
+    
+    Listener.Stop()
+}
+```
+
 
