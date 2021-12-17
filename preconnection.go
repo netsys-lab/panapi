@@ -22,9 +22,12 @@ import (
 type Listener struct {
 	listener           network.Listener
 	ConnectionReceived chan network.Connection
+	Stopped            chan struct{}
+	Error              chan error
 }
 
 func (l *Listener) Stop() error {
+	defer close(l.Stopped)
 	return l.listener.Stop()
 }
 
@@ -36,17 +39,23 @@ type Preconnection struct {
 
 func (p *Preconnection) Listen() Listener {
 	c := make(chan network.Connection)
-	go func(p *Preconnection, c chan network.Connection) {
+	errCh := make(chan error)
+	go func(p *Preconnection, c chan network.Connection, e chan error) {
 		for {
 			conn, err := p.listener.Listen()
 			if err != nil {
-				conn.SetError(err)
+				errCh <- err
 			} else {
 				c <- conn
 			}
 		}
-	}(p, c)
-	return Listener{ConnectionReceived: c, listener: p.listener}
+	}(p, c, errCh)
+	return Listener{
+		ConnectionReceived: c,
+		listener:           p.listener,
+		Stopped:            make(chan struct{}),
+		Error:              errCh,
+	}
 }
 
 func (p *Preconnection) Initiate() (network.Connection, error) {

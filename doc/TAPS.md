@@ -185,6 +185,7 @@ This is how the above would look in practice in "more idiomatic Go", including s
 
 ```Go
 import (
+    "fmt"
     // we pretend that "helper" implements all the irrelevant stuff
     "internal/helper" 
     "github.com/netsys-lab/panapi"
@@ -241,9 +242,8 @@ func main() {
         SecurityParameters,
     )
 
-
     Listener := Preconnection.Listen()
-
+    defer Listener.Stop()
 
     //---- Loop to handle multiple connections begin ----
     for {
@@ -254,14 +254,12 @@ func main() {
             // Asynchronously call Message handler
             // (does not block)
             go HandleMessage(Connection)
-        case Error := <- Listener.EstablishmentError:
+        case EstablishmentError := <- Listener.Error:
             // Handle Error
-            fmt.Println(Error)
+            fmt.Println(EstablishmentError)
         }
     }
     //---- Loop end ----
-    
-    Listener.Stop()
 }
 ```
 
