@@ -18,7 +18,6 @@ import (
 	//"crypto/rsa"
 	//"crypto/x509"
 	//"encoding/pem"
-	"errors"
 	"fmt"
 	//"math/big"
 
@@ -36,7 +35,7 @@ func (scion *scion) NewListener(e *network.Endpoint) (network.Listener, error) {
 	case network.TRANSPORT_QUIC:
 		return NewQUICListener(e.LocalAddress, scion.tp)
 	default:
-		return nil, errors.New(fmt.Sprintf("Transport %s not implemented for SCION", e.Transport))
+		return nil, fmt.Errorf("Transport %s not implemented for SCION", e.Transport)
 	}
 }
 
@@ -47,7 +46,7 @@ func (scion *scion) NewDialer(e *network.Endpoint) (network.Dialer, error) {
 	case network.TRANSPORT_QUIC:
 		return NewQUICDialer(e.RemoteAddress, scion.tp)
 	default:
-		return nil, errors.New(fmt.Sprintf("Transport %s not implemented for SCION", e.Transport))
+		return nil, fmt.Errorf("Transport %s not implemented for SCION", e.Transport)
 	}
 }
 

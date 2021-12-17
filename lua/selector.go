@@ -23,7 +23,7 @@ import (
 	"github.com/yuin/gopher-lua"
 )
 
-func new_lua_path_interface(intf pan.PathInterface) *lua.LTable {
+func newLuaPathInterface(intf pan.PathInterface) *lua.LTable {
 	iface := lua.LTable{}
 	iface.RawSetString("IA", lua.LString(intf.IA.String()))
 	iface.RawSetString("IfID", lua.LNumber(intf.IfID))
@@ -31,7 +31,7 @@ func new_lua_path_interface(intf pan.PathInterface) *lua.LTable {
 
 }
 
-func new_lua_path(path *pan.Path) *lua.LTable {
+func newLuaPath(path *pan.Path) *lua.LTable {
 	t := lua.LTable{}
 	if path != nil {
 		t.RawSetString("Source", lua.LString(path.Source.String()))
@@ -45,7 +45,7 @@ func new_lua_path(path *pan.Path) *lua.LTable {
 
 			ifaces := lua.LTable{}
 			for _, i := range path.Metadata.Interfaces {
-				ifaces.Append(new_lua_path_interface(i))
+				ifaces.Append(newLuaPathInterface(i))
 			}
 			meta.RawSetString("Interfaces", &ifaces)
 
@@ -132,7 +132,7 @@ func (s state) set_paths(addr pan.UDPAddr, ppaths []*pan.Path) (lpaths []*lua.LT
 	raddr := addr.String()
 	lpaths = make([]*lua.LTable, len(ppaths))
 	for i, ppath := range ppaths {
-		lpath := new_lua_path(ppath)
+		lpath := newLuaPath(ppath)
 		s.lpaths[raddr][string(ppath.Fingerprint)] = lpath
 		s.ppaths[lpath] = ppath
 		lpaths[i] = lpath
@@ -264,7 +264,7 @@ func (s *LuaSelector) PathDown(local, remote pan.UDPAddr, fp pan.PathFingerprint
 		lua.LString(local.String()),
 		lua.LString(remote.String()),
 		lua.LString(fp),
-		new_lua_path_interface(pi),
+		newLuaPathInterface(pi),
 	)
 
 }
