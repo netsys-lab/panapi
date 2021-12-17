@@ -64,7 +64,9 @@ func (m *FixedMessage) Read(p []byte) (n int, err error) {
 
 // Write appends the contents of p to the message m, return error network.EOM when the capacity is met or exceeded
 func (m *FixedMessage) Write(p []byte) (i int, err error) {
-	//TODO should it read byte by byte?
+	//TODO should it write byte by byte?
+	//Or should it write all then parse?
+	//what to do with possible header reading erros
 	httpHeader, mimeHeader, body, err := parseMessage(p)
 	m.httpHeader = httpHeader
 	if err == nil {
@@ -116,6 +118,7 @@ func (m FixedMessage) headerAsString() string {
 }
 
 func parseMessage(p []byte) (httpHeader []byte, mimeHeader textproto.MIMEHeader, body []byte, err error) {
+	//TODO handle missing parts of the message like no mimeHeader, no body etc.
 	httpHeaderAndMessage := strings.SplitAfterN(string(p), "\r\n", 2)
 	if len(httpHeaderAndMessage) == 2 {
 		httpHeader = []byte(httpHeaderAndMessage[0])
