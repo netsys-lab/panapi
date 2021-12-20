@@ -124,6 +124,82 @@ func (d Directionality) String() string {
 	}[d-Bidirectional]
 }
 
+type CapacityProfile uint8
+
+const (
+	// The application provides no information about its expected
+	// capacity profile.
+	Default CapacityProfile = iota
+
+	// The application is not interactive. It expects to send
+	// and/or receive data without any urgency. This can, for
+	// example, be used to select protocol stacks with scavenger
+	// transmission control and/or to assign the traffic to a
+	// lower-effort service.
+	Scavenger
+
+	// The application is interactive, and prefers loss to
+	// latency. Response time should be optimized at the expense
+	// of delay variation and efficient use of the available
+	// capacity when sending on this connection. This can be used
+	// by the system to disable the coalescing of multiple small
+	// Messages into larger packets (Nagle's algorithm); to prefer
+	// immediate acknowledgment from the peer endpoint when
+	// supported by the underlying transport; and so on.
+	LowLatencyInteractive
+
+	// The application prefers loss to latency, but is not
+	// interactive. Response time should be optimized at the
+	// expense of delay variation and efficient use of the
+	// available capacity when sending on this connection.
+	LowLatencyNonInteractive
+
+	// The application expects to send/receive data at a constant
+	// rate after Connection establishment. Delay and delay
+	// variation should be minimized at the expense of efficient
+	// use of the available capacity. This implies that the
+	// Connection might fail if the Path is unable to maintain the
+	// desired rate.
+	ConstantRateStreaming
+
+	// The application expects to send/receive data at the maximum
+	// rate allowed by its congestion controller over a relatively
+	// long period of time.
+	CapacitySeeking
+)
+
+func (p CapacityProfile) String() string {
+	return [...]string{
+		"Default",
+		"Scavenger",
+		"Low Latency/Interactive",
+		"Low Latency/Non-Interactive",
+		"Constant-Rate Streaming",
+		"Capacity-Seeking",
+	}[p-Default]
+}
+
+// StreamScheduler types are taken from RFC8260
+type StreamScheduler uint8
+
+const (
+	SCTP_SS_FCFS   StreamScheduler = iota // First-Come, First-Served Scheduler
+	SCTP_SS_RR                            // Round-Robin Scheduler
+	SCTP_SS_RR_PKT                        // Round-Robin Scheduler per Packet
+	SCTP_SS_PRIO                          // Priority-Based Scheduler
+	SCTP_SS_FC                            // Fair Capacity Scheduler
+	SCTP_SS_WFQ                           // Weighted Fair Queueing Scheduler
+)
+
+type ConnectionState uint8
+
+const (
+	Establishing ConnectionState = iota
+	Established
+	Closing
+	Closed
+)
+
 type TransportProperties struct {
 	// Reliability pecifies whether the application needs to use a
 	// transport protocol that ensures that all data is received
@@ -316,31 +392,35 @@ type TransportProperties struct {
 	ActiveReadBeforeSend Preference
 }
 
-// NewTransportProperties creates TransportProperties with the recommended defaults from https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2
+// NewTransportProperties creates TransportProperties with the
+// recommended defaults from
+// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2
 func NewTransportProperties() *TransportProperties {
 	return &TransportProperties{
-		Reliability:              Require,
-		PreserveMsgBoundaries:    Ignore,
-		PerMsgReliability:        Ignore,
-		PreserveOrder:            Require,
-		ZeroRTTMsg:               Ignore,
-		Multistreaming:           Prefer,
-		FullChecksumSend:         Require,
-		FullChecksumRecv:         Require,
-		CongestionControl:        Require,
-		KeepAlive:                Ignore,
-		Interface:                map[string]Preference{},
-		PvD:                      map[string]Preference{},
-		UseTemporaryLocalAddress: unset,   // Needs to be resolved at runtime: Avoid for Listeners and Rendezvous Connections, else Prefer
-		Multipath:                dynamic, // Needs to be resolved at runtime: Disabled for Initiated and Rendezvous Connections, else Passive
-		AdvertisesAltAddr:        false,
-		Direction:                Bidirectional,
-		SoftErrorNotify:          Ignore,
-		ActiveReadBeforeSend:     Ignore,
+		Reliability:           Require,
+		PreserveMsgBoundaries: Ignore,
+		PerMsgReliability:     Ignore,
+		PreserveOrder:         Require,
+		ZeroRTTMsg:            Ignore,
+		Multistreaming:        Prefer,
+		FullChecksumSend:      Require,
+		FullChecksumRecv:      Require,
+		CongestionControl:     Require,
+		KeepAlive:             Ignore,
+		Interface:             map[string]Preference{},
+		PvD:                   map[string]Preference{},
+		// Needs to be resolved at runtime: Avoid for Listeners and Rendezvous Connections, else Prefer
+		UseTemporaryLocalAddress: unset,
+		// Needs to be resolved at runtime: Disabled for Initiated and Rendezvous Connections, else Passive
+		Multipath:            dynamic,
+		AdvertisesAltAddr:    false,
+		Direction:            Bidirectional,
+		SoftErrorNotify:      Ignore,
+		ActiveReadBeforeSend: Ignore,
 	}
 }
 
-func set(st interface{}, key string, value interface{}) error {
+func get(st interface{}, key string) (value reflect.Value, err error) {
 	s := reflect.ValueOf(st).Elem()
 	reg := regexp.MustCompile("[^a-z]+")
 	stripKey := reg.ReplaceAllString(strings.ToLower(key), "")
@@ -352,7 +432,15 @@ func set(st interface{}, key string, value interface{}) error {
 		}
 	})
 	if !f.IsValid() {
-		return fmt.Errorf("Type %T has no Field %s (%s)", st, key, stripKey)
+		return reflect.ValueOf(nil), fmt.Errorf("Type %T has no Field %s (%s)", st, key, stripKey)
+	}
+	return f, nil
+}
+
+func set(st interface{}, key string, value interface{}) error {
+	f, err := get(st, key)
+	if err != nil {
+		return err
 	}
 	p := reflect.ValueOf(value)
 	if p.IsValid() && p.Type().AssignableTo(f.Type()) {
@@ -389,45 +477,57 @@ func (tp *TransportProperties) Set(property string, value interface{}) error {
 	return set(tp, property, value)
 }
 
-// Require has the effect of selecting only protocols/paths providing the property and failing otherwise.
+// Require has the effect of selecting only protocols/paths providing
+// the property and failing otherwise.
 //
-// It is equivalent to calling tp.Set(property, Require) - the caveats of func tp.Set apply in full
+// Deprecated: This is equivalent to calling tp.Set(property, Require) - the caveats
+// of func tp.Set apply in full
 func (tp *TransportProperties) Require(property string) error {
 	return tp.Set(property, Require)
 }
 
-// Prefer has the effect of prefering protocols/paths providing the property and proceeding otherwise
+// Prefer has the effect of prefering protocols/paths providing the
+// property and proceeding otherwise
 //
-// It is equivalent to calling tp.Set(property, Prefer) - the caveats of func tp.Set apply in full
+// Deprecated: This is equivalent to calling tp.Set(property, Prefer) - the caveats
+// of func tp.Set apply in full
 func (tp *TransportProperties) Prefer(property string) error {
 	return tp.Set(property, Prefer)
 }
 
 // Ignore has the effect of expressing no preference for the given property
 //
-// It is equivalent to calling tp.Set(property, Ignore) - the caveats of func tp.Set apply in full
+// Deprecated: This is equivalent to calling tp.Set(property, Ignore) - the caveats
+// of func tp.Set apply in full
 func (tp *TransportProperties) Ignore(property string) error {
 	return tp.Set(property, Ignore)
 
 }
 
-// Avoid has the effect of avoiding protocols/paths with the property and proceeding otherwise
+// Avoid has the effect of avoiding protocols/paths with the property
+// and proceeding otherwise
 //
-// It is equivalent to calling tp.Set(property, Avoid) - the caveats of func tp.Set apply in full
+// Deprecated: This is equivalent to calling tp.Set(property, Avoid) - the caveats
+// of func tp.Set apply in full
 func (tp *TransportProperties) Avoid(property string) error {
 	return tp.Set(property, Avoid)
 }
 
-// Prohibit has the effect of failing if the property can not be avoided
+// Prohibit has the effect of failing if the property can not be
+// avoided
 //
-// It is equivalent to calling tp.Set(property, Prohibit) - the caveats of func tp.Set apply in full
+// Deprecated: This is equivalent to calling tp.Set(property, Prohibit) - the
+// caveats of func tp.Set apply in full
 func (tp *TransportProperties) Prohibit(property string) error {
 	return tp.Set(property, Prohibit)
 }
 
-// SecurityParameters is a structure used to configure security for a Preconnection
+// SecurityParameters is a structure used to configure security for a
+// Preconnection
 type SecurityParameters struct {
-	// Local identity and private keys: Used to perform private key operations and prove one's identity to the Remote Endpoint.
+	// Local identity and private keys: Used to perform private
+	// key operations and prove one's identity to the Remote
+	// Endpoint.
 	Identity string
 	KeyPair  KeyPair
 
@@ -498,72 +598,6 @@ func (sp *SecurityParameters) Set(parameter string, value interface{}) error {
 	return set(sp, parameter, value)
 }
 
-type CapacityProfile uint8
-
-const (
-	// The application provides no information about its expected
-	// capacity profile.
-	Default CapacityProfile = iota
-
-	// The application is not interactive. It expects to send
-	// and/or receive data without any urgency. This can, for
-	// example, be used to select protocol stacks with scavenger
-	// transmission control and/or to assign the traffic to a
-	// lower-effort service.
-	Scavenger
-
-	// The application is interactive, and prefers loss to
-	// latency. Response time should be optimized at the expense
-	// of delay variation and efficient use of the available
-	// capacity when sending on this connection. This can be used
-	// by the system to disable the coalescing of multiple small
-	// Messages into larger packets (Nagle's algorithm); to prefer
-	// immediate acknowledgment from the peer endpoint when
-	// supported by the underlying transport; and so on.
-	LowLatencyInteractive
-
-	// The application prefers loss to latency, but is not
-	// interactive. Response time should be optimized at the
-	// expense of delay variation and efficient use of the
-	// available capacity when sending on this connection.
-	LowLatencyNonInteractive
-
-	// The application expects to send/receive data at a constant
-	// rate after Connection establishment. Delay and delay
-	// variation should be minimized at the expense of efficient
-	// use of the available capacity. This implies that the
-	// Connection might fail if the Path is unable to maintain the
-	// desired rate.
-	ConstantRateStreaming
-
-	// The application expects to send/receive data at the maximum
-	// rate allowed by its congestion controller over a relatively
-	// long period of time.
-	CapacitySeeking
-)
-
-func (p CapacityProfile) String() string {
-	return [...]string{
-		"Default",
-		"Scavenger",
-		"Low Latency/Interactive",
-		"Low Latency/Non-Interactive",
-		"Constant-Rate Streaming",
-		"Capacity-Seeking",
-	}[p-Default]
-}
-
-type StreamScheduler uint8
-
-const (
-	SCTP_SS_FCFS   StreamScheduler = iota // First-Come, First-Served Scheduler
-	SCTP_SS_RR                            // Round-Robin Scheduler
-	SCTP_SS_RR_PKT                        // Round-Robin Scheduler per Packet
-	SCTP_SS_PRIO                          // Priority-Based Scheduler
-	SCTP_SS_FC                            // Fair Capacity Scheduler
-	SCTP_SS_WFQ                           // Weighted Fair Queueing Scheduler
-)
-
 type ConnectionProperties struct {
 	// RecvChecksumLen specifies the minimum number of bytes in a
 	// received message that need to be covered by a checksum. A
@@ -587,7 +621,8 @@ type ConnectionProperties struct {
 	// Connections in the same Connection Group. No guarantees of
 	// a specific behavior regarding Connection Priority are
 	// given; a Transport Services system may ignore this
-	// property. (See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.2)
+	// property. (See
+	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.2)
 	ConnPrio uint
 
 	// ConnTimeout specifies how long to wait before deciding that
@@ -595,7 +630,8 @@ type ConnectionProperties struct {
 	// deliver data to the Remote Endpoint. Adjusting this
 	// Property will only take effect when the underlying stack
 	// supports reliability. A value of 0 means that no timeout is
-	// scheduled. (See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.3)
+	// scheduled. (See
+	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.3)
 	ConnTimeout time.Duration
 
 	// KeepAliveTimeout specifies the maximum length of time an
@@ -665,7 +701,7 @@ type ConnectionProperties struct {
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.10)
 	IsolateSession bool
 
-	zeroRTTMsgMaxLen, singularTransmissionMsgMaxLen, sendMsgMaxLen, recMsgMaxLen uint
+	zeroRTTMsgMaxLen, singularTransmissionMsgMaxLen, sendMsgMaxLen, recvMsgMaxLen uint
 }
 
 // ZeroRTTMsgMaxLen returns the maximum Message size that can be sent
@@ -698,7 +734,34 @@ func (cp *ConnectionProperties) SendMsgMaxLen() uint {
 //
 // (See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.11.4)
 func (cp *ConnectionProperties) RecvMsgMaxLen() uint {
-	return cp.recMsgMaxLen
+	return cp.recvMsgMaxLen
+}
+
+// Get returns value associated with Field property of cp. If property
+// is not a Field of cp, an error is returned
+//
+// For the sake of respecting the TAPS (draft) spec, this function
+// allows you to say:
+//  value, err := cp.Get("multipath-policy")
+//  if err != nil {
+//    ... // handle runtime error
+//  }
+//  policy, ok := value.(MultipathPolicy)
+//  if !ok {
+//    ... // handle failed type assertion
+//  }
+//
+// In idiomatic Go, you would (and should) instead say:
+//  policy := cp.MultipathPolicy
+//
+// Deprecated: Use func cp.Get only if you must. Direct access
+// of the underlying ConnectionProperties struct Fields is usually
+// preferred. This function is implemented using reflection and
+// dynamic string matching, which is inherently inefficient and prone
+// to bugs triggered at runtime.
+func (cp *ConnectionProperties) Get(property string) (value interface{}, err error) {
+	v, err := get(cp, property)
+	return v.Interface(), err
 }
 
 // KeyPair clearly associates a Private and Public Key into a pair
@@ -712,4 +775,43 @@ type Connection struct {
 	Ready      chan bool
 	SoftError  chan error
 	PathChange chan bool
+	cp         *ConnectionProperties
+}
+
+// GetProperties can be called at any time by the application to query ConnectionProperties
+//
+// Deprecated: Per https://go.dev/doc/effective_go#Getters, it is not
+// idiomatic Go to put "Get" into a getter's name
+func (c *Connection) GetProperties() *ConnectionProperties {
+	return c.Properties()
+}
+
+// Properties can be called at any time by the application to query ConnectionProperties
+func (c *Connection) Properties() *ConnectionProperties {
+	return c.cp
+}
+
+// SetProperty stores value for property, which is stripped of case
+// and non-alphabetic characters before being matched against the
+// (equally stripped) exported Field names of c. The type of value
+// must be assignable to type of the targeted property Field,
+// otherwise an error is returned.
+//
+// For the sake of respecting the TAPS (draft) spec as closely as
+// possible, this function allows you to say:
+//  err := c.SetProperty("connPrio", 100)
+//  if err != nil {
+//    ... // handle runtime error
+//  }
+//
+// In idiomatic Go, you would (and should) instead say:
+//  c.Properties().ConnPrio = 100
+//
+// Deprecated: Use func c.SetProperty only if you must. Direct access
+// of the underlying ConnectionProperties struct Fields is usually
+// preferred. This function is implemented using reflection and
+// dynamic string matching, which is inherently inefficient and prone
+// to bugs triggered at runtime.
+func (c *Connection) SetProperty(property string, value interface{}) error {
+	return set(c.cp, property, value)
 }

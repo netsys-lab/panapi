@@ -38,6 +38,25 @@ type Preconnection struct {
 	dialer   network.Dialer
 }
 
+// Listen on a Preconnection p returns a new Listener
+//
+//    Listener := Preconnection.Listen()
+//    defer Listener.Stop()
+//
+//    //---- Loop to handle multiple connections begin ----
+//    for {
+//        // Wait for available data (i.e., "events") on any channel
+//        select {
+//        // New connections are sent on the "ConnectionReceived" channel provided by Listener
+//        case Connection := <- Listener.ConnectionReceived:
+//            // Asynchronously call Message handler
+//            // (does not block)
+//            go HandleMessage(Connection)
+//        case EstablishmentError := <- Listener.Error:
+//            // Handle Error
+//            fmt.Println(EstablishmentError)
+//        }
+//    }
 func (p *Preconnection) Listen() Listener {
 	c := make(chan network.Connection)
 	errCh := make(chan error)
