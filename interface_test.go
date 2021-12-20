@@ -14,16 +14,97 @@
 package panapi
 
 import (
+	"crypto/tls"
+	"fmt"
 	"testing"
 )
 
 func TestTransportProperties(t *testing.T) {
+	proptests := []struct {
+		property   string
+		preference interface{}
+		err        bool
+	}{
+		{"Reliability", Ignore, false},
+		{"preserve-msg-boundaries", Require, false},
+		{"PerMsgReliability", Bidirectional, true},
+		{"Typo", Require, true},
+		{"PreserveOrder", nil, true},
+		{"ZeroRTTMsg", unset, false},
+		//Multistreaming:           Prefer,
+		//FullChecksumSend:         Require,
+		//FullChecksumRecv:         Require,
+		//CongestionControl:        Require,
+		//KeepAlive:                Ignore,
+		{"Interface", map[string]Preference{"eth0": Ignore}, false},
+		{"PvD", map[string]uint8{"fnord": 1}, true},
+		//UseTemporaryLocalAddress: unset,   // Needs to be resolved at runtime: Avoid for Listeners and Rendezvous Connections, else Prefer
+		//Multipath:                dynamic, // Needs to be resolved at runtime: Disabled for Initiated and Rendezvous Connections, else Passive
+		{"AdvertisesAltAddr", false, false},
+		{"Direction", UnidirectionalSend, false},
+		//SoftErrorNotify:          Ignore,
+		//ActiveReadBeforeSend:     Ignore,*/
+
+	}
+
 	p := NewTransportProperties()
 
-	err := p.SetPreference("reliability", Ignore)
-
-	if err != nil {
-		t.Fatal(err)
+	for _, tt := range proptests {
+		err := p.Set(tt.property, tt.preference)
+		t.Logf("%s: %v (Error: %v)", tt.property, tt.preference, err)
+		if tt.err {
+			if err == nil {
+				t.Fatal("expected error, got no error")
+			}
+		} else if err != nil {
+			t.Fatal(err)
+		}
 	}
-	t.Logf("%+v", p)
+	//t.Logf("%+v", p)
+}
+
+func ExampleTransportProperties_Set() {
+	tp := NewTransportProperties()
+
+	// Calling Set() is possible, because the TAPS (draft)
+	// specifies a Set function on the TransportProperties Object
+	// (i.e., struct).
+	err := tp.Set("preserve-msg-boundaries", Require)
+	if err != nil {
+		panic(err)
+	}
+
+	// Idiomatic Go would be to instead directly access the Field:
+	tp.PreserveMsgBoundaries = Ignore
+
+	fmt.Println(tp.PreserveMsgBoundaries)
+	// Output: Ignore
+
+}
+
+func ExampleSecurityParameters_Set() {
+	sp := NewSecurityParameters()
+
+	var suite *tls.CipherSuite
+	// find CipherSuite
+	for _, suite = range tls.CipherSuites() {
+		if suite.ID == tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 {
+			break
+		}
+	}
+
+	// Calling Set() is possible, because the TAPS (draft)
+	// specifies a Set function on the SecurityParameters Object
+	// (i.e., struct).
+	err := sp.Set("ciphersuite", suite)
+	if err != nil {
+		panic(err)
+	}
+
+	// Idiomatic Go would be to instead directly access the Field:
+	sp.CipherSuite = suite
+
+	fmt.Printf("%s", sp.CipherSuite.Name)
+	// Output: TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+
 }

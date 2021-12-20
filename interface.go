@@ -5,18 +5,36 @@ import (
 	"crypto/tls"
 	"fmt"
 	"reflect"
+	"regexp"
+	"strings"
 	"time"
 )
 
 type Preference uint8
 
 const (
-	unset    Preference = iota // (Implementation detail: Indicate that recommended default value for Property should be used)
-	Ignore                     // No preference
-	Require                    // Select only protocols/paths providing the property, fail otherwise
-	Prefer                     // Prefer protocols/paths providing the property, proceed otherwise
-	Avoid                      // Prefer protocols/paths not providing the property, proceed otherwise
-	Prohibit                   // Select only protocols/paths not providing the property, fail otherwise
+	// (Implementation detail: Indicate that recommended default
+	// value for Property should be used)
+	unset Preference = iota
+
+	// No preference
+	Ignore
+
+	// Select only protocols/paths providing the property, fail
+	// otherwise
+	Require
+
+	// Prefer protocols/paths providing the property, proceed
+	// otherwise
+	Prefer
+
+	// Prefer protocols/paths not providing the property, proceed
+	// otherwise
+	Avoid
+
+	// Select only protocols/paths not providing the property,
+	// fail otherwise
+	Prohibit
 )
 
 func (p Preference) String() string {
@@ -30,16 +48,28 @@ func (p Preference) String() string {
 	}[p-unset]
 }
 
-type MultiPathPreference uint8
+type MultipathPreference uint8
 
 const (
-	dynamic  MultiPathPreference = iota // (Implementation detail: need to use different defaults depending on endpoint)
-	Disabled                            // The connection will not use multiple paths once established, even if the chosen transport supports using multiple paths.
-	Active                              // The connection will negotiate the use of multiple paths if the chosen transport supports this.
-	Passive                             // The connection will support the use of multiple paths if the Remote Endpoint requests it.
+	// (Implementation detail: need to use different defaults
+	// depending on endpoint)
+	dynamic MultipathPreference = iota
+
+	// The connection will not use multiple paths once
+	// established, even if the chosen transport supports using
+	// multiple paths.
+	Disabled
+
+	// The connection will negotiate the use of multiple paths if
+	// the chosen transport supports this.
+	Active
+
+	// The connection will support the use of multiple paths if
+	// the Remote Endpoint requests it.
+	Passive
 )
 
-func (p MultiPathPreference) String() string {
+func (p MultipathPreference) String() string {
 	return [...]string{
 		"(unset)",
 		"Disabled",
@@ -48,13 +78,42 @@ func (p MultiPathPreference) String() string {
 	}[p-dynamic]
 }
 
+type MultipathPolicy uint8
+
+const (
+	// The connection ought only to attempt to migrate between
+	// different paths when the original path is lost or becomes
+	// unusable.
+	Handover MultipathPolicy = iota
+
+	// The connection ought only to attempt to minimize the
+	// latency for interactive traffic patterns by transmitting
+	// data across multiple paths when this is beneficial. The
+	// goal of minimizing the latency will be balanced against the
+	// cost of each of these paths. Depending on the cost of the
+	// lower-latency path, the scheduling might choose to use a
+	// higher-latency path. Traffic can be scheduled such that
+	// data may be transmitted on multiple paths in parallel to
+	// achieve a lower latency.
+	Interactive
+
+	// The connection ought to attempt to use multiple paths in
+	// parallel to maximize available capacity and possibly
+	// overcome the capacity limitations of the individual paths.
+	Aggregate
+)
+
 type Directionality uint8
 
 const (
-	Bidirectional         Directionality = iota // The connection must support sending and receiving data
-	UnidirectionalSend                          // The connection must support sending data, and the application cannot use the connection to receive any data
-	UnidirectionalReceive                       // The connection must support receiving data, and the application cannot use the connection to send any data
+	// The connection must support sending and receiving data
+	Bidirectional Directionality = iota
 
+	// The connection must support sending data, and the application cannot use the connection to receive any data
+	UnidirectionalSend
+
+	// The connection must support receiving data, and the application cannot use the connection to send any data
+	UnidirectionalReceive
 )
 
 func (d Directionality) String() string {
@@ -184,23 +243,12 @@ type TransportProperties struct {
 	// between the same end hosts. Using multiple paths allows
 	// connections to migrate between interfaces or aggregate
 	// bandwidth as availability and performance properties
-	// change. Possible values are:
-	//
-	// Disabled: The connection will not use multiple paths once
-	//    established, even if the chosen transport supports using
-	//    multiple paths.
-	//
-	// Active: The connection will negotiate the use of multiple
-	//    paths if the chosen transport supports this.
-	//
-	// Passive: The connection will support the use of multiple
-	//    paths if the Remote Endpoint requests it.
-	//
+	// change.
 	//
 	// The policy for using multiple paths is specified using the
-	// separate multipath-policy property. (TODO) (See
+	// separate MultipathPolicy ConnectionProperty. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.14)
-	Multipath MultiPathPreference
+	Multipath MultipathPreference
 
 	// UseTemporaryLocalAddress allows the application to express
 	// a preference for the use of temporary local addresses,
@@ -292,86 +340,129 @@ func NewTransportProperties() *TransportProperties {
 	}
 }
 
-// SetProperty is not yet implemented
-func (tp *TransportProperties) SetProperty(property, value string) {
-
-}
-
-// SetPreference stores preference for property.
-//
-// CAUTION: Use SetPreference only if you must. Direct access of
-// struct Fields is usually preferred. This function is implemented
-// using reflection and probably a bit slow. It inherently also could
-// have runtime bugs.
-func (tp *TransportProperties) SetPreference(property string, preference Preference) error {
-	s := reflect.ValueOf(tp).Elem()
-	f := s.FieldByName(property)
+func set(st interface{}, key string, value interface{}) error {
+	s := reflect.ValueOf(st).Elem()
+	reg := regexp.MustCompile("[^a-z]+")
+	stripKey := reg.ReplaceAllString(strings.ToLower(key), "")
+	f := s.FieldByNameFunc(func(k string) bool {
+		if reg.ReplaceAllString(strings.ToLower(k), "") == stripKey {
+			return true
+		} else {
+			return false
+		}
+	})
 	if !f.IsValid() {
-		return fmt.Errorf("Preference %s not found", property)
+		return fmt.Errorf("Type %T has no Field %s (%s)", st, key, stripKey)
 	}
-	p := reflect.ValueOf(preference)
-	if p.Type().AssignableTo(f.Type()) {
+	p := reflect.ValueOf(value)
+	if p.IsValid() && p.Type().AssignableTo(f.Type()) {
 		f.Set(p)
 	} else {
-		return fmt.Errorf("Can not assign a Preference to Property %s", property)
+		return fmt.Errorf("Can not assign value of Type %T to Field %s of Type %T (expect %s)", value, key, st, f.Type())
 	}
 	return nil
+
 }
 
-/* GetPreference returns the stored Preference for property, or Ignore if preference is not found
-
-   Deprecated: GetX is not idiomatic Go, use X instead, i.e., "Preference(property)"
-
-func (tp *TransportProperties) GetPreference(property string) Preference {
-	return tp.Preference(property)
+// Set stores value for property, which is stripped of case and
+// non-alphabetic characters before being matched against the (equally
+// stripped) exported Field names of tp. The type of value must be
+// assignable to type of the targeted property Field, otherwise an
+// error is returned.
+//
+// For the sake of respecting the TAPS (draft) spec as closely as
+// possible, this function allows you to instead say:
+//  err := tp.Set("preserve-msg-boundaries", Require)
+//  if err != nil {
+//    ... // handle runtime error
+//  }
+//
+// In idiomatic Go, you would (and should) instead say:
+//  tp.PreserveMsgBoundaries = Require
+//
+// Deprecated: Use func tp.Set only if you must. Direct access of the
+// TransportProperties struct Fields is usually preferred. This
+// function is implemented using reflection and dynamic string
+// matching, which is inherently inefficient and prone to bugs
+// triggered at runtime.
+func (tp *TransportProperties) Set(property string, value interface{}) error {
+	return set(tp, property, value)
 }
 
-// Preference returns the stored Preference for property, or Ignore if preference is not found
-func (tp *TransportProperties) Preference(property string) Preference {
-	p, ok := tp.preferences[property]
-	if !ok {
-		return Ignore
-	}
-	return p
-        }*/
-
-// Require has the effect of selecting only protocols/paths providing the property and failing otherwise
-func (tp *TransportProperties) Require(property string) {
-	tp.SetPreference(property, Require)
-
+// Require has the effect of selecting only protocols/paths providing the property and failing otherwise.
+//
+// It is equivalent to calling tp.Set(property, Require) - the caveats of func tp.Set apply in full
+func (tp *TransportProperties) Require(property string) error {
+	return tp.Set(property, Require)
 }
 
 // Prefer has the effect of prefering protocols/paths providing the property and proceeding otherwise
-func (tp *TransportProperties) Prefer(property string) {
-	tp.SetPreference(property, Prefer)
+//
+// It is equivalent to calling tp.Set(property, Prefer) - the caveats of func tp.Set apply in full
+func (tp *TransportProperties) Prefer(property string) error {
+	return tp.Set(property, Prefer)
 }
 
 // Ignore has the effect of expressing no preference for the given property
-func (tp *TransportProperties) Ignore(property string) {
-	tp.SetPreference(property, Ignore)
+//
+// It is equivalent to calling tp.Set(property, Ignore) - the caveats of func tp.Set apply in full
+func (tp *TransportProperties) Ignore(property string) error {
+	return tp.Set(property, Ignore)
 
 }
 
 // Avoid has the effect of avoiding protocols/paths with the property and proceeding otherwise
-func (tp *TransportProperties) Avoid(property string) {
-	tp.SetPreference(property, Avoid)
+//
+// It is equivalent to calling tp.Set(property, Avoid) - the caveats of func tp.Set apply in full
+func (tp *TransportProperties) Avoid(property string) error {
+	return tp.Set(property, Avoid)
 }
 
 // Prohibit has the effect of failing if the property can not be avoided
-func (tp *TransportProperties) Prohibit(property string) {
-	tp.SetPreference(property, Prohibit)
+//
+// It is equivalent to calling tp.Set(property, Prohibit) - the caveats of func tp.Set apply in full
+func (tp *TransportProperties) Prohibit(property string) error {
+	return tp.Set(property, Prohibit)
 }
 
 // SecurityParameters is a structure used to configure security for a Preconnection
 type SecurityParameters struct {
-	Identity              string //? []byte?
-	KeyPair               KeyPair
+	// Local identity and private keys: Used to perform private key operations and prove one's identity to the Remote Endpoint.
+	Identity string
+	KeyPair  KeyPair
+
+	// Supported algorithms: Used to restrict what parameters are
+	// used by underlying transport security protocols. When not
+	// specified, these algorithms should use known and safe
+	// defaults for the system. Parameters include: ciphersuites,
+	// supported groups, and signature algorithms. These
+	// parameters take a collection of supported algorithms as
+	// parameter.
 	SupportedGroup        tls.CurveID
-	CipherSuite           tls.CipherSuite
+	CipherSuite           *tls.CipherSuite
 	SignatureAlgorithm    tls.SignatureScheme
 	MaxCachedSessions     uint
 	CachedSessionLifetime time.Duration
-	//PSK not supported
+
+	// Unsupported
+	PSK crypto.PrivateKey
+}
+
+// NewSecurityParameters TODO
+func NewSecurityParameters() *SecurityParameters {
+	return &SecurityParameters{}
+}
+
+// NewDisabledSecurityParameters is intended for compatibility with
+// endpoints that do not support transport security protocols (such as
+// TCP without support for TLS)
+func NewDisabledSecurityParameters() *SecurityParameters {
+	return &SecurityParameters{}
+}
+
+// NewOpportunisticSecurityParameters() is not yet implemented
+func NewOpportunisticSecurityParameters() *SecurityParameters {
+	return &SecurityParameters{}
 }
 
 // SetTrustVerificationCallback is not yet implemented
@@ -382,46 +473,232 @@ func (sp SecurityParameters) SetTrustVerificationCallback() {
 func (sp SecurityParameters) SetIdentityChallengeCallback() {
 }
 
+// Set stores value for parameter, which is stripped of case and
+// non-alphabetic characters before being matched against the (equally
+// stripped) exported Field names of sp. The type of value must be
+// assignable to type of the targeted parameter Field, otherwise an
+// error is returned.
+//
+// For the sake of respecting the TAPS (draft) spec as closely as
+// possible, this function allows you to instead say:
+//  err := sp.Set("supported-group", tls.CurveP521)
+//  if err != nil {
+//    ... // handle runtime error
+//  }
+//
+// In idiomatic Go, you would (and should) instead say:
+//  sp.SupportedGroup = tls.CurveP521
+//
+// Deprecated: Use func sp.Set only if you must. Direct access of the
+// SecurityParameters struct Fields is usually preferred. This
+// function is implemented using reflection and dynamic string
+// matching, which is inherently inefficient and prone to bugs
+// triggered at runtime.
+func (sp *SecurityParameters) Set(parameter string, value interface{}) error {
+	return set(sp, parameter, value)
+}
+
 type CapacityProfile uint8
 
 const (
+	// The application provides no information about its expected
+	// capacity profile.
 	Default CapacityProfile = iota
+
+	// The application is not interactive. It expects to send
+	// and/or receive data without any urgency. This can, for
+	// example, be used to select protocol stacks with scavenger
+	// transmission control and/or to assign the traffic to a
+	// lower-effort service.
 	Scavenger
+
+	// The application is interactive, and prefers loss to
+	// latency. Response time should be optimized at the expense
+	// of delay variation and efficient use of the available
+	// capacity when sending on this connection. This can be used
+	// by the system to disable the coalescing of multiple small
+	// Messages into larger packets (Nagle's algorithm); to prefer
+	// immediate acknowledgment from the peer endpoint when
+	// supported by the underlying transport; and so on.
 	LowLatencyInteractive
+
+	// The application prefers loss to latency, but is not
+	// interactive. Response time should be optimized at the
+	// expense of delay variation and efficient use of the
+	// available capacity when sending on this connection.
 	LowLatencyNonInteractive
+
+	// The application expects to send/receive data at a constant
+	// rate after Connection establishment. Delay and delay
+	// variation should be minimized at the expense of efficient
+	// use of the available capacity. This implies that the
+	// Connection might fail if the Path is unable to maintain the
+	// desired rate.
 	ConstantRateStreaming
+
+	// The application expects to send/receive data at the maximum
+	// rate allowed by its congestion controller over a relatively
+	// long period of time.
 	CapacitySeeking
 )
 
-var profileNames = [...]string{
-	"Default",
-	"Scavenger",
-	"Low Latency/Interactive",
-	"Low Latency/Non-Interactive",
-	"Constant-Rate Streaming",
-	"Capacity-Seeking",
+func (p CapacityProfile) String() string {
+	return [...]string{
+		"Default",
+		"Scavenger",
+		"Low Latency/Interactive",
+		"Low Latency/Non-Interactive",
+		"Constant-Rate Streaming",
+		"Capacity-Seeking",
+	}[p-Default]
 }
 
-func (p CapacityProfile) String() string {
-	return profileNames[p-Default]
-}
+type StreamScheduler uint8
+
+const (
+	SCTP_SS_FCFS   StreamScheduler = iota // First-Come, First-Served Scheduler
+	SCTP_SS_RR                            // Round-Robin Scheduler
+	SCTP_SS_RR_PKT                        // Round-Robin Scheduler per Packet
+	SCTP_SS_PRIO                          // Priority-Based Scheduler
+	SCTP_SS_FC                            // Fair Capacity Scheduler
+	SCTP_SS_WFQ                           // Weighted Fair Queueing Scheduler
+)
 
 type ConnectionProperties struct {
+	// RecvChecksumLen specifies the minimum number of bytes in a
+	// received message that need to be covered by a checksum. A
+	// special value of 0 means that a received packet does not
+	// need to have a non-zero checksum field. A receiving
+	// endpoint will not forward messages that have less coverage
+	// to the application. The application is responsible for
+	// handling any corruption within the non-protected part of
+	// the message [RFC8085]. (See
+	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.1)
 	RecvChecksumLen uint
-	ConnPrio        uint
-	ConnTimeout     time.Duration
-	// ConnScheduler not yet implemented
+
+	// ConnPrio is a non-negative integer representing the
+	// relative inverse priority (i.e., a lower value reflects a
+	// higher priority) of this Connection relative to other
+	// Connections in the same Connection Group. It has no effect
+	// on Connections not part of a Connection Group. This
+	// property is not entangled when Connections are cloned,
+	// i.e., changing the Priority on one Connection in a
+	// Connection Group does not change it on the other
+	// Connections in the same Connection Group. No guarantees of
+	// a specific behavior regarding Connection Priority are
+	// given; a Transport Services system may ignore this
+	// property. (See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.2)
+	ConnPrio uint
+
+	// ConnTimeout specifies how long to wait before deciding that
+	// an active Connection has failed when trying to reliably
+	// deliver data to the Remote Endpoint. Adjusting this
+	// Property will only take effect when the underlying stack
+	// supports reliability. A value of 0 means that no timeout is
+	// scheduled. (See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.3)
+	ConnTimeout time.Duration
+
+	// KeepAliveTimeout specifies the maximum length of time an
+	// idle connection (one for which no transport packets have
+	// been sent) should wait before the Local Endpoint sends a
+	// keep-alive packet to the Remote Endpoint. Adjusting this
+	// Property will only take effect when the underlying stack
+	// supports sending keep-alive packets. Guidance on setting
+	// this value for datagram transports is provided in
+	// [RFC8085]. A value greater than ConnTimeout or the special
+	// value 0 will disable the sending of keep-alive
+	// packets. (See
+	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.4)
+	KeepAliveTimeout time.Duration
+
+	// ConnScheduler specifies which scheduler should be used
+	// among Connections within a Connection Group. (See
+	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.5)
+	ConnScheduler StreamScheduler
+
+	// ConnCapacityProfile specifies the desired network treatment
+	// for traffic sent by the application and the tradeoffs the
+	// application is prepared to make in path and protocol
+	// selection to receive that desired treatment. When the
+	// capacity profile is set to a value other than Default, the
+	// Transport Services system SHOULD select paths and configure
+	// protocols to optimize the tradeoff between delay, delay
+	// variation, and efficient use of the available capacity
+	// based on the capacity profile specified. (See
+	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.6)
 	ConnCapacityProfile CapacityProfile
-	/*
-	   MultipathPolicy
-	   MinSendRate
-	   MinRecvRate
-	   MaxSendRate
-	   MaxRecvRate
-	   GroupConnLimit
-	   IsolateSession
-	   not yet implemented
-	*/
+
+	// MultipathPolicy specifies the local policy for transferring
+	// data across multiple paths between the same end hosts if
+	// Multipath is not set to Disabled in TransportProperty. (See
+	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.7)
+	MultipathPolicy MultipathPolicy
+
+	// [Max|Min][Send|Recv]Rate specifies an upper-bound rate that
+	// a transfer is not expected to exceed (even if flow control
+	// and congestion control allow higher rates), and/or a
+	// lower-bound rate below which the application does not deem
+	// it will be useful. These are specified in bits per
+	// second. The special value of 0 (alternatively: a Max Rate
+	// set lower than the corresponding Min Rate) indicates that
+	// no bound is specified.  (See
+	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.8)
+	MinSendRate, MinRecvRate, MaxSendRate, MaxRecvRate uint
+
+	// GroupConnLimit controls the number of Connections that can
+	// be accepted from a peer as new members of the Connection's
+	// group. Similar to SetNewConnectionLimit(), this limits the
+	// number of ConnectionReceived Events that will occur, but
+	// constrained to the group of the Connection associated with
+	// this property. For a multi-streaming transport, this limits
+	// the number of allowed streams. (See
+	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.9)
+	GroupConnLimit uint
+
+	// IsolateSession, when set, will initiate new Connections
+	// using as little cached information (such as session tickets
+	// or cookies) as possible from previous connections that are
+	// not in the same Connection Group. Any state generated by
+	// this Connection will only be shared with Connections in the
+	// same Connection Group. Cloned Connections will use saved
+	// state from within the Connection Group. (See
+	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.10)
+	IsolateSession bool
+
+	zeroRTTMsgMaxLen, singularTransmissionMsgMaxLen, sendMsgMaxLen, recMsgMaxLen uint
+}
+
+// ZeroRTTMsgMaxLen returns the maximum Message size that can be sent
+// before or during Connection establishment in bytes.
+//
+// (See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.11.1)
+func (cp *ConnectionProperties) ZeroRTTMsgMaxLen() uint {
+	return cp.zeroRTTMsgMaxLen
+}
+
+// SingularTransmissionMsgMaxLen, if applicable, returns the maximum
+// Message size that can be sent without incurring network-layer
+// fragmentation at the sender, in bytes.
+//
+// (See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.11.2)
+func (cp *ConnectionProperties) SingularTransmissionMsgMaxLen() uint {
+	return cp.singularTransmissionMsgMaxLen
+}
+
+// SendMsgMaxLen returns the maximum Message size that an application
+// can send, in bytes.
+//
+// (See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.11.3)
+func (cp *ConnectionProperties) SendMsgMaxLen() uint {
+	return cp.sendMsgMaxLen
+}
+
+// RecvMsgMaxLen returns the maximum Message size that an application
+// can receive, in bytes.
+//
+// (See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.11.4)
+func (cp *ConnectionProperties) RecvMsgMaxLen() uint {
+	return cp.recMsgMaxLen
 }
 
 // KeyPair clearly associates a Private and Public Key into a pair
@@ -430,6 +707,7 @@ type KeyPair struct {
 	PublicKey  crypto.PublicKey
 }
 
+//
 type Connection struct {
 	Ready      chan bool
 	SoftError  chan error
