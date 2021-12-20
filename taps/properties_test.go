@@ -11,10 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package panapi
+
+package taps
 
 import (
-	"crypto/tls"
 	"fmt"
 	"testing"
 )
@@ -31,20 +31,10 @@ func TestTransportProperties(t *testing.T) {
 		{"Typo", Require, true},
 		{"PreserveOrder", nil, true},
 		{"ZeroRTTMsg", unset, false},
-		//Multistreaming:           Prefer,
-		//FullChecksumSend:         Require,
-		//FullChecksumRecv:         Require,
-		//CongestionControl:        Require,
-		//KeepAlive:                Ignore,
 		{"Interface", map[string]Preference{"eth0": Ignore}, false},
 		{"PvD", map[string]uint8{"fnord": 1}, true},
-		//UseTemporaryLocalAddress: unset,   // Needs to be resolved at runtime: Avoid for Listeners and Rendezvous Connections, else Prefer
-		//Multipath:                dynamic, // Needs to be resolved at runtime: Disabled for Initiated and Rendezvous Connections, else Passive
 		{"AdvertisesAltAddr", false, false},
 		{"Direction", UnidirectionalSend, false},
-		//SoftErrorNotify:          Ignore,
-		//ActiveReadBeforeSend:     Ignore,*/
-
 	}
 
 	p := NewTransportProperties()
@@ -79,32 +69,5 @@ func ExampleTransportProperties_Set() {
 
 	fmt.Println(tp.PreserveMsgBoundaries)
 	// Output: Ignore
-
-}
-
-func ExampleSecurityParameters_Set() {
-	sp := NewSecurityParameters()
-
-	var suite *tls.CipherSuite
-	// find CipherSuite
-	for _, suite = range tls.CipherSuites() {
-		if suite.ID == tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 {
-			break
-		}
-	}
-
-	// Calling Set() is possible, because the TAPS (draft)
-	// specifies a Set function on the SecurityParameters Object
-	// (i.e., struct).
-	err := sp.Set("ciphersuite", suite)
-	if err != nil {
-		panic(err)
-	}
-
-	// Idiomatic Go would be to instead directly access the Field:
-	sp.CipherSuite = suite
-
-	fmt.Printf("%s", sp.CipherSuite.Name)
-	// Output: TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
 
 }

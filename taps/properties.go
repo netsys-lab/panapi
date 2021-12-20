@@ -1,203 +1,7 @@
-package panapi
+package taps
 
 import (
-	"crypto"
-	"crypto/tls"
-	"fmt"
-	"reflect"
-	"regexp"
-	"strings"
 	"time"
-)
-
-type Preference uint8
-
-const (
-	// (Implementation detail: Indicate that recommended default
-	// value for Property should be used)
-	unset Preference = iota
-
-	// No preference
-	Ignore
-
-	// Select only protocols/paths providing the property, fail
-	// otherwise
-	Require
-
-	// Prefer protocols/paths providing the property, proceed
-	// otherwise
-	Prefer
-
-	// Prefer protocols/paths not providing the property, proceed
-	// otherwise
-	Avoid
-
-	// Select only protocols/paths not providing the property,
-	// fail otherwise
-	Prohibit
-)
-
-func (p Preference) String() string {
-	return [...]string{
-		"(unset)",
-		"Ignore",
-		"Require",
-		"Prefer",
-		"Avoid",
-		"Prohibit",
-	}[p-unset]
-}
-
-type MultipathPreference uint8
-
-const (
-	// (Implementation detail: need to use different defaults
-	// depending on endpoint)
-	dynamic MultipathPreference = iota
-
-	// The connection will not use multiple paths once
-	// established, even if the chosen transport supports using
-	// multiple paths.
-	Disabled
-
-	// The connection will negotiate the use of multiple paths if
-	// the chosen transport supports this.
-	Active
-
-	// The connection will support the use of multiple paths if
-	// the Remote Endpoint requests it.
-	Passive
-)
-
-func (p MultipathPreference) String() string {
-	return [...]string{
-		"(unset)",
-		"Disabled",
-		"Active",
-		"Passive",
-	}[p-dynamic]
-}
-
-type MultipathPolicy uint8
-
-const (
-	// The connection ought only to attempt to migrate between
-	// different paths when the original path is lost or becomes
-	// unusable.
-	Handover MultipathPolicy = iota
-
-	// The connection ought only to attempt to minimize the
-	// latency for interactive traffic patterns by transmitting
-	// data across multiple paths when this is beneficial. The
-	// goal of minimizing the latency will be balanced against the
-	// cost of each of these paths. Depending on the cost of the
-	// lower-latency path, the scheduling might choose to use a
-	// higher-latency path. Traffic can be scheduled such that
-	// data may be transmitted on multiple paths in parallel to
-	// achieve a lower latency.
-	Interactive
-
-	// The connection ought to attempt to use multiple paths in
-	// parallel to maximize available capacity and possibly
-	// overcome the capacity limitations of the individual paths.
-	Aggregate
-)
-
-type Directionality uint8
-
-const (
-	// The connection must support sending and receiving data
-	Bidirectional Directionality = iota
-
-	// The connection must support sending data, and the application cannot use the connection to receive any data
-	UnidirectionalSend
-
-	// The connection must support receiving data, and the application cannot use the connection to send any data
-	UnidirectionalReceive
-)
-
-func (d Directionality) String() string {
-	return [...]string{
-		"Bidirectional",
-		"Unidirectional Send",
-		"Unidirectional Receive",
-	}[d-Bidirectional]
-}
-
-type CapacityProfile uint8
-
-const (
-	// The application provides no information about its expected
-	// capacity profile.
-	Default CapacityProfile = iota
-
-	// The application is not interactive. It expects to send
-	// and/or receive data without any urgency. This can, for
-	// example, be used to select protocol stacks with scavenger
-	// transmission control and/or to assign the traffic to a
-	// lower-effort service.
-	Scavenger
-
-	// The application is interactive, and prefers loss to
-	// latency. Response time should be optimized at the expense
-	// of delay variation and efficient use of the available
-	// capacity when sending on this connection. This can be used
-	// by the system to disable the coalescing of multiple small
-	// Messages into larger packets (Nagle's algorithm); to prefer
-	// immediate acknowledgment from the peer endpoint when
-	// supported by the underlying transport; and so on.
-	LowLatencyInteractive
-
-	// The application prefers loss to latency, but is not
-	// interactive. Response time should be optimized at the
-	// expense of delay variation and efficient use of the
-	// available capacity when sending on this connection.
-	LowLatencyNonInteractive
-
-	// The application expects to send/receive data at a constant
-	// rate after Connection establishment. Delay and delay
-	// variation should be minimized at the expense of efficient
-	// use of the available capacity. This implies that the
-	// Connection might fail if the Path is unable to maintain the
-	// desired rate.
-	ConstantRateStreaming
-
-	// The application expects to send/receive data at the maximum
-	// rate allowed by its congestion controller over a relatively
-	// long period of time.
-	CapacitySeeking
-)
-
-func (p CapacityProfile) String() string {
-	return [...]string{
-		"Default",
-		"Scavenger",
-		"Low Latency/Interactive",
-		"Low Latency/Non-Interactive",
-		"Constant-Rate Streaming",
-		"Capacity-Seeking",
-	}[p-Default]
-}
-
-// StreamScheduler types are taken from RFC8260
-type StreamScheduler uint8
-
-const (
-	SCTP_SS_FCFS   StreamScheduler = iota // First-Come, First-Served Scheduler
-	SCTP_SS_RR                            // Round-Robin Scheduler
-	SCTP_SS_RR_PKT                        // Round-Robin Scheduler per Packet
-	SCTP_SS_PRIO                          // Priority-Based Scheduler
-	SCTP_SS_FC                            // Fair Capacity Scheduler
-	SCTP_SS_WFQ                           // Weighted Fair Queueing Scheduler
-)
-
-type ConnectionState uint8
-
-const (
-	Establishing ConnectionState = iota
-	Established
-	Closing
-	Closed
 )
 
 type TransportProperties struct {
@@ -420,38 +224,6 @@ func NewTransportProperties() *TransportProperties {
 	}
 }
 
-func get(st interface{}, key string) (value reflect.Value, err error) {
-	s := reflect.ValueOf(st).Elem()
-	reg := regexp.MustCompile("[^a-z]+")
-	stripKey := reg.ReplaceAllString(strings.ToLower(key), "")
-	f := s.FieldByNameFunc(func(k string) bool {
-		if reg.ReplaceAllString(strings.ToLower(k), "") == stripKey {
-			return true
-		} else {
-			return false
-		}
-	})
-	if !f.IsValid() {
-		return reflect.ValueOf(nil), fmt.Errorf("Type %T has no Field %s (%s)", st, key, stripKey)
-	}
-	return f, nil
-}
-
-func set(st interface{}, key string, value interface{}) error {
-	f, err := get(st, key)
-	if err != nil {
-		return err
-	}
-	p := reflect.ValueOf(value)
-	if p.IsValid() && p.Type().AssignableTo(f.Type()) {
-		f.Set(p)
-	} else {
-		return fmt.Errorf("Can not assign value of Type %T to Field %s of Type %T (expect %s)", value, key, st, f.Type())
-	}
-	return nil
-
-}
-
 // Set stores value for property, which is stripped of case and
 // non-alphabetic characters before being matched against the (equally
 // stripped) exported Field names of tp. The type of value must be
@@ -459,7 +231,7 @@ func set(st interface{}, key string, value interface{}) error {
 // error is returned.
 //
 // For the sake of respecting the TAPS (draft) spec as closely as
-// possible, this function allows you to instead say:
+// possible, this function allows you to say:
 //  err := tp.Set("preserve-msg-boundaries", Require)
 //  if err != nil {
 //    ... // handle runtime error
@@ -520,82 +292,6 @@ func (tp *TransportProperties) Avoid(property string) error {
 // caveats of func tp.Set apply in full
 func (tp *TransportProperties) Prohibit(property string) error {
 	return tp.Set(property, Prohibit)
-}
-
-// SecurityParameters is a structure used to configure security for a
-// Preconnection
-type SecurityParameters struct {
-	// Local identity and private keys: Used to perform private
-	// key operations and prove one's identity to the Remote
-	// Endpoint.
-	Identity string
-	KeyPair  KeyPair
-
-	// Supported algorithms: Used to restrict what parameters are
-	// used by underlying transport security protocols. When not
-	// specified, these algorithms should use known and safe
-	// defaults for the system. Parameters include: ciphersuites,
-	// supported groups, and signature algorithms. These
-	// parameters take a collection of supported algorithms as
-	// parameter.
-	SupportedGroup        tls.CurveID
-	CipherSuite           *tls.CipherSuite
-	SignatureAlgorithm    tls.SignatureScheme
-	MaxCachedSessions     uint
-	CachedSessionLifetime time.Duration
-
-	// Unsupported
-	PSK crypto.PrivateKey
-}
-
-// NewSecurityParameters TODO
-func NewSecurityParameters() *SecurityParameters {
-	return &SecurityParameters{}
-}
-
-// NewDisabledSecurityParameters is intended for compatibility with
-// endpoints that do not support transport security protocols (such as
-// TCP without support for TLS)
-func NewDisabledSecurityParameters() *SecurityParameters {
-	return &SecurityParameters{}
-}
-
-// NewOpportunisticSecurityParameters() is not yet implemented
-func NewOpportunisticSecurityParameters() *SecurityParameters {
-	return &SecurityParameters{}
-}
-
-// SetTrustVerificationCallback is not yet implemented
-func (sp SecurityParameters) SetTrustVerificationCallback() {
-}
-
-// SetIdentityChallengeCallback is not yet implemented
-func (sp SecurityParameters) SetIdentityChallengeCallback() {
-}
-
-// Set stores value for parameter, which is stripped of case and
-// non-alphabetic characters before being matched against the (equally
-// stripped) exported Field names of sp. The type of value must be
-// assignable to type of the targeted parameter Field, otherwise an
-// error is returned.
-//
-// For the sake of respecting the TAPS (draft) spec as closely as
-// possible, this function allows you to instead say:
-//  err := sp.Set("supported-group", tls.CurveP521)
-//  if err != nil {
-//    ... // handle runtime error
-//  }
-//
-// In idiomatic Go, you would (and should) instead say:
-//  sp.SupportedGroup = tls.CurveP521
-//
-// Deprecated: Use func sp.Set only if you must. Direct access of the
-// SecurityParameters struct Fields is usually preferred. This
-// function is implemented using reflection and dynamic string
-// matching, which is inherently inefficient and prone to bugs
-// triggered at runtime.
-func (sp *SecurityParameters) Set(parameter string, value interface{}) error {
-	return set(sp, parameter, value)
 }
 
 type ConnectionProperties struct {
@@ -764,13 +460,7 @@ func (cp *ConnectionProperties) Get(property string) (value interface{}, err err
 	return v.Interface(), err
 }
 
-// KeyPair clearly associates a Private and Public Key into a pair
-type KeyPair struct {
-	PrivateKey crypto.PrivateKey
-	PublicKey  crypto.PublicKey
-}
-
-//
+// Connection
 type Connection struct {
 	Ready      chan bool
 	SoftError  chan error
