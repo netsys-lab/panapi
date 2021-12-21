@@ -2,6 +2,8 @@ package taps
 
 import (
 	"time"
+
+	"github.com/netsys-lab/panapi/internal/enum"
 )
 
 type TransportProperties struct {
@@ -11,26 +13,26 @@ type TransportProperties struct {
 	// data transfer is enabled, this also entails being notified
 	// when a Connection is closed or aborted. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.1)
-	Reliability Preference
+	Reliability enum.Preference
 
 	// PreserveMsgBoundaries specifies whether the application
 	// needs or prefers to use a transport protocol that preserves
 	// message boundaries. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.2)
-	PreserveMsgBoundaries Preference
+	PreserveMsgBoundaries enum.Preference
 
 	// PerMsgReliability specifies whether an application
 	// considers it useful to specify different reliability
 	// requirements for individual Messages in a Connection. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.3)
-	PerMsgReliability Preference
+	PerMsgReliability enum.Preference
 
 	// PreserveOrder specifies whether the application wishes to
 	// use a transport protocol that can ensure that data is
 	// received by the application on the other end in the same
 	// order as it was sent. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.4)
-	PreserveOrder Preference
+	PreserveOrder enum.Preference
 
 	// ZeroRTTMsg specifies whether an application would like to
 	// supply a Message to the transport protocol before
@@ -40,21 +42,21 @@ type TransportProperties struct {
 	// multiple times (i.e., multiple copies of the message data
 	// may be passed to the Remote Endpoint). (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.5)
-	ZeroRTTMsg Preference
+	ZeroRTTMsg enum.Preference
 
 	// Multistreaming specifies that the application would prefer
 	// multiple Connections within a Connection Group to be
 	// provided by streams of a single underlying transport
 	// connection where possible.  (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.6)
-	Multistreaming Preference
+	Multistreaming enum.Preference
 
 	// FullChecksumSend specifies the application's need for
 	// protection against corruption for all data transmitted on
 	// this Connection. Disabling this property could enable later
 	// control of the sender checksum coverage. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.7)
-	FullChecksumSend Preference
+	FullChecksumSend enum.Preference
 
 	// FullChecksumRecv specifies the application's need for
 	// protection against corruption for all data received on this
@@ -62,7 +64,7 @@ type TransportProperties struct {
 	// control of the required minimum receiver checksum
 	// coverage. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.8)
-	FullChecksumRecv Preference
+	FullChecksumRecv enum.Preference
 
 	// CongestionControl specifies whether the application would like
 	// the Connection to be congestion controlled or not. Note
@@ -78,7 +80,7 @@ type TransportProperties struct {
 	// control in the application can have negative performance
 	// implications. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.9)
-	CongestionControl Preference
+	CongestionControl enum.Preference
 
 	// KeepAlive specifies whether the application would like the
 	// Connection to send keep-alive packets or not. Note that if
@@ -88,7 +90,7 @@ type TransportProperties struct {
 	// the system will use the default period for generation of
 	// the keep alive-packets. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.10)
-	KeepAlive Preference
+	KeepAlive enum.Preference
 
 	// Interface allows the application to select any specific
 	// network interfaces or categories of interfaces it wants to
@@ -102,7 +104,7 @@ type TransportProperties struct {
 	// Properties, this property maps interface identifier strings
 	// to Preferences. In future, common interface types might
 	// exist as constants.
-	Interface map[string]Preference
+	Interface map[string]enum.Preference
 
 	// PvD allows the application to control path selection by
 	// selecting which specific Provisioning Domain (PvD) or
@@ -116,7 +118,7 @@ type TransportProperties struct {
 	// Properties, this property maps PvD identifier strings to
 	// Preferences. In future, common PvD types and categories
 	// might exist as constants.
-	PvD map[string]Preference
+	PvD map[string]enum.Preference
 
 	// Multipath specifies whether and how applications want to
 	// take advantage of transferring data across multiple paths
@@ -128,7 +130,7 @@ type TransportProperties struct {
 	// The policy for using multiple paths is specified using the
 	// separate MultipathPolicy ConnectionProperty. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.14)
-	Multipath MultipathPreference
+	Multipath enum.MultipathPreference
 
 	// UseTemporaryLocalAddress allows the application to express
 	// a preference for the use of temporary local addresses,
@@ -145,7 +147,7 @@ type TransportProperties struct {
 	// interfere with resumption mechanisms that some protocols
 	// rely on to reduce initial latency. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.13)
-	UseTemporaryLocalAddress Preference
+	UseTemporaryLocalAddress enum.Preference
 
 	// AdvertisesAltAddr specifies whether alternative addresses,
 	// e.g., of other interfaces, should be advertised to the peer
@@ -164,7 +166,7 @@ type TransportProperties struct {
 	// that supports bidirectional communication to be
 	// selected. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.16)
-	Direction Directionality
+	Direction enum.Directionality
 
 	// SoftErrorNotify specifies whether an application considers
 	// it useful to be informed when an ICMP error message arrives
@@ -175,7 +177,7 @@ type TransportProperties struct {
 	// be delivered, so applications cannot rely upon receiving
 	// them [RFC8085]. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.17)
-	SoftErrorNotify Preference
+	SoftErrorNotify enum.Preference
 
 	// ActiveReadBeforeSend specifies whether an application wants
 	// to diverge from the most common communication pattern - the
@@ -193,7 +195,7 @@ type TransportProperties struct {
 	// streams, where the first transmitted data takes the role of
 	// an active open signal. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.18)
-	ActiveReadBeforeSend Preference
+	ActiveReadBeforeSend enum.Preference
 }
 
 // NewTransportProperties creates TransportProperties with the
@@ -211,8 +213,8 @@ func NewTransportProperties() *TransportProperties {
 		FullChecksumRecv:      Require,
 		CongestionControl:     Require,
 		KeepAlive:             Ignore,
-		Interface:             map[string]Preference{},
-		PvD:                   map[string]Preference{},
+		Interface:             map[string]enum.Preference{},
+		PvD:                   map[string]enum.Preference{},
 		// Needs to be resolved at runtime: Avoid for Listeners and Rendezvous Connections, else Prefer
 		UseTemporaryLocalAddress: unset,
 		// Needs to be resolved at runtime: Disabled for Initiated and Rendezvous Connections, else Passive
@@ -346,7 +348,7 @@ type ConnectionProperties struct {
 	// ConnScheduler specifies which scheduler should be used
 	// among Connections within a Connection Group. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.5)
-	ConnScheduler StreamScheduler
+	ConnScheduler enum.StreamScheduler
 
 	// ConnCapacityProfile specifies the desired network treatment
 	// for traffic sent by the application and the tradeoffs the
@@ -358,13 +360,13 @@ type ConnectionProperties struct {
 	// variation, and efficient use of the available capacity
 	// based on the capacity profile specified. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.6)
-	ConnCapacityProfile CapacityProfile
+	ConnCapacityProfile enum.CapacityProfile
 
 	// MultipathPolicy specifies the local policy for transferring
 	// data across multiple paths between the same end hosts if
 	// Multipath is not set to Disabled in TransportProperty. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.7)
-	MultipathPolicy MultipathPolicy
+	MultipathPolicy enum.MultipathPolicy
 
 	// [Max|Min][Send|Recv]Rate specifies an upper-bound rate that
 	// a transfer is not expected to exceed (even if flow control
@@ -458,50 +460,4 @@ func (cp *ConnectionProperties) RecvMsgMaxLen() uint {
 func (cp *ConnectionProperties) Get(property string) (value interface{}, err error) {
 	v, err := get(cp, property)
 	return v.Interface(), err
-}
-
-// Connection
-type Connection struct {
-	Ready      chan bool
-	SoftError  chan error
-	PathChange chan bool
-	cp         *ConnectionProperties
-}
-
-// GetProperties can be called at any time by the application to query ConnectionProperties
-//
-// Deprecated: Per https://go.dev/doc/effective_go#Getters, it is not
-// idiomatic Go to put "Get" into a getter's name
-func (c *Connection) GetProperties() *ConnectionProperties {
-	return c.Properties()
-}
-
-// Properties can be called at any time by the application to query ConnectionProperties
-func (c *Connection) Properties() *ConnectionProperties {
-	return c.cp
-}
-
-// SetProperty stores value for property, which is stripped of case
-// and non-alphabetic characters before being matched against the
-// (equally stripped) exported Field names of c. The type of value
-// must be assignable to type of the targeted property Field,
-// otherwise an error is returned.
-//
-// For the sake of respecting the TAPS (draft) spec as closely as
-// possible, this function allows you to say:
-//  err := c.SetProperty("connPrio", 100)
-//  if err != nil {
-//    ... // handle runtime error
-//  }
-//
-// In idiomatic Go, you would (and should) instead say:
-//  c.Properties().ConnPrio = 100
-//
-// Deprecated: Use func c.SetProperty only if you must. Direct access
-// of the underlying ConnectionProperties struct Fields is usually
-// preferred. This function is implemented using reflection and
-// dynamic string matching, which is inherently inefficient and prone
-// to bugs triggered at runtime.
-func (c *Connection) SetProperty(property string, value interface{}) error {
-	return set(c.cp, property, value)
 }
