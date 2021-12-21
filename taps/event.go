@@ -2,6 +2,10 @@ package taps
 
 type Event interface{}
 
+type ErrorEvent struct {
+	Error error
+}
+
 type SentEvent struct {
 	MessageContext *MessageContext
 }
@@ -11,13 +15,11 @@ type ExpiredEvent struct {
 }
 
 type SendErrorEvent struct {
-	MessageContext *MessageContext
 	Error          error
+	MessageContext *MessageContext
 }
 
-type SoftErrorEvent struct {
-	Error error
-}
+type SoftErrorEvent ErrorEvent
 
 type ReadyEvent struct{}
 
@@ -29,25 +31,32 @@ type ReceivedEvent struct {
 }
 
 type ReceivedPartialEvent struct {
-	ReceivedEvent
-	EndOfMessage bool
+	MessageContext *MessageContext
+	MessageData    []byte
+	EndOfMessage   bool
 }
 
 type ReceiveErrorEvent struct {
-	MessageContext *MessageContext
 	Error          error
+	MessageContext *MessageContext
 }
 
-type ConnectionReceivedEvent struct{}
+// ConnectionReceivedEvent is raised with a new Connection when a
+// Remote Endpoint has established a transport-layer connection to
+// this Listener (for Connection-oriented transport protocols), or
+// when the first Message has been received from the Remote Endpoint
+// (for Connectionless protocols), causing a new Connection to be
+// created.
+type ConnectionReceivedEvent struct {
+	Connection *Connection
+}
+
+type StoppedEvent struct{}
 
 type RendezvousDoneEvent struct{}
 
 type ClosedEvent struct{}
 
-type EstablishmentErrorEvent struct {
-	Error error
-}
+type EstablishmentErrorEvent ErrorEvent
 
-type ConnectionErrorEvent struct {
-	Error error
-}
+type ConnectionErrorEvent ErrorEvent
