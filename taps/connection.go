@@ -1,14 +1,12 @@
 package taps
 
+import "github.com/netsys-lab/panapi/internal/enum"
+
 // Connection
 //
-// Deprecated: It is at this point unclear, whether representing the
-// notion of an "Event" from the TAPS draft as Go channels is a good
-// idea. Feedback welcome.
 type Connection struct {
-	Ready      chan bool
-	SoftError  chan error
-	PathChange chan bool
+	Events chan Event
+	State  enum.ConnectionState
 	// Need to keep track of ConnPrio Property separately from the
 	// other ConnectionProperties. Feedback welcome.
 	ConnPrio uint
@@ -68,10 +66,35 @@ func (c *Connection) SetProperty(property string, value interface{}) error {
 	return err
 }
 
+//
+func (c *Connection) Send(messageData []byte) {
+	c.SendContext(nil, messageData, true)
+}
+
+//
+func (c *Connection) SendContext(messageContext *MessageContext, messageData []byte, endOfMessage bool) {
+
+}
+
+func (c *Connection) Receive() {
+
+}
+
+func (c *Connection) Close() {
+
+}
+
+func (c *Connection) Abort() {
+
+}
+
+/*
+
+
 func (c *Connection) Clone() *ConnectionGroup {
 	return &ConnectionGroup{}
 }
 
 type ConnectionGroup struct {
 	// TODO
-}
+        }*/

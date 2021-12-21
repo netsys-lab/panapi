@@ -7,6 +7,12 @@ import (
 	"github.com/netsys-lab/panapi/internal/enum"
 )
 
+// MessageContext carries extra information that an application might
+// wish to attach to a Message
+//
+// As laid out in the TAPS spec, this type of Object is reminiscent of
+// https://pkg.go.dev/context, which could conceivably also be
+// used instead of this dedicated MessageContext Type. Feedback welcome.
 type MessageContext struct {
 	// MsgLifetime specifies how long a particular Message can
 	// wait to be sent to the Remote Endpoint before it is
