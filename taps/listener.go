@@ -1,12 +1,10 @@
 package taps
 
-import "fmt"
-
 // Listener passively waits for Connections from RemoteEndpoints.
 //
 // See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-7.2
 type Listener struct {
-	Events  chan Event
+	events  chan Event
 	preConn Preconnection
 }
 
@@ -18,16 +16,20 @@ func newListener(preConn Preconnection) *Listener {
 	}
 
 	if len(preConn.LocalEndpoints) == 0 {
-		l.Events <- EstablishmentErrorEvent{Error: fmt.Errorf("no local endpoint for listening specified")}
+		l.events <- ErrorEvent{Error: NewEstablishmentError("can't create listener without at least 1 local endpoint")}
 		l.Stop()
 	}
 	return &l
 }
 
-// Stop sends the StoppedEvent and closes the Events channel
+func (l *Listener) Events() <-chan Event {
+	return l.events
+}
+
+// Stop sends the StoppedEvent and closes l's event channel
 func (l *Listener) Stop() {
-	l.Events <- StoppedEvent{}
-	close(l.Events)
+	l.events <- StoppedEvent{}
+	close(l.events)
 }
 
 // SetNewConnectionLimit sets a cap on the number of inbound

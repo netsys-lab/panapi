@@ -6,11 +6,12 @@ type Endpoint struct {
 	Address   net.Addr
 	Transport string
 	Network   string
+	Interface string
 }
 
-type LocalEndpoint Endpoint
+type LocalEndpoint struct{ Endpoint }
 
-type RemoteEndpoint Endpoint
+type RemoteEndpoint struct{ Endpoint }
 
 func NewRemoteEndpoint() *RemoteEndpoint {
 	return &RemoteEndpoint{}
@@ -45,7 +46,7 @@ func (e *Endpoint) WithHostname(name string) {
 }
 
 func (e *Endpoint) WithInterface(intf string) {
-
+	e.Interface = intf
 }
 
 func (e *Endpoint) WithProtocol(proto Protocol) {

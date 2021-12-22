@@ -226,6 +226,40 @@ func NewTransportProperties() *TransportProperties {
 	}
 }
 
+// Copy returns a new TransportProperties struct with its values deeply copied from tp
+func (tp *TransportProperties) Copy() *TransportProperties {
+	var (
+		newInterface = make(map[string]enum.Preference)
+		newPvD       = make(map[string]enum.Preference)
+	)
+	for key, value := range tp.Interface {
+		newInterface[key] = value
+	}
+	for key, value := range tp.PvD {
+		newPvD[key] = value
+	}
+	return &TransportProperties{
+		Reliability:              tp.Reliability,
+		PreserveMsgBoundaries:    tp.PreserveMsgBoundaries,
+		PerMsgReliability:        tp.PerMsgReliability,
+		PreserveOrder:            tp.PreserveOrder,
+		ZeroRTTMsg:               tp.ZeroRTTMsg,
+		Multistreaming:           tp.Multistreaming,
+		FullChecksumSend:         tp.FullChecksumSend,
+		FullChecksumRecv:         tp.FullChecksumRecv,
+		CongestionControl:        tp.CongestionControl,
+		KeepAlive:                tp.KeepAlive,
+		Interface:                newInterface,
+		PvD:                      newPvD,
+		Multipath:                tp.Multipath,
+		UseTemporaryLocalAddress: tp.UseTemporaryLocalAddress,
+		AdvertisesAltAddr:        tp.AdvertisesAltAddr,
+		Direction:                tp.Direction,
+		SoftErrorNotify:          tp.SoftErrorNotify,
+		ActiveReadBeforeSend:     tp.ActiveReadBeforeSend,
+	}
+}
+
 // Set stores value for property, which is stripped of case and
 // non-alphabetic characters before being matched against the (equally
 // stripped) exported Field names of tp. The type of value must be
@@ -400,6 +434,25 @@ type ConnectionProperties struct {
 	IsolateSession bool
 
 	zeroRTTMsgMaxLen, singularTransmissionMsgMaxLen, sendMsgMaxLen, recvMsgMaxLen uint
+}
+
+// Copy returns a new ConnectionProperties struct with its values deeply copied from cp
+func (cp *ConnectionProperties) Copy() *ConnectionProperties {
+	return &ConnectionProperties{
+		RecvChecksumLen:     cp.RecvChecksumLen,
+		ConnPrio:            cp.ConnPrio,
+		ConnTimeout:         cp.ConnTimeout,
+		KeepAliveTimeout:    cp.KeepAliveTimeout,
+		ConnScheduler:       cp.ConnScheduler,
+		ConnCapacityProfile: cp.ConnCapacityProfile,
+		MultipathPolicy:     cp.MultipathPolicy,
+		MinSendRate:         cp.MinSendRate,
+		MinRecvRate:         cp.MinRecvRate,
+		MaxSendRate:         cp.MaxSendRate,
+		MaxRecvRate:         cp.MaxRecvRate,
+		GroupConnLimit:      cp.GroupConnLimit,
+		IsolateSession:      cp.IsolateSession,
+	}
 }
 
 // ZeroRTTMsgMaxLen returns the maximum Message size that can be sent

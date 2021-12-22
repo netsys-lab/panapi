@@ -82,6 +82,20 @@ func (sp *SecurityParameters) Set(parameter string, value interface{}) error {
 	return set(sp, parameter, value)
 }
 
+// Copy returns a new SecurityParameters struct with its values deeply copied from sp
+func (sp *SecurityParameters) Copy() *SecurityParameters {
+	return &SecurityParameters{
+		Identity:              sp.Identity,
+		KeyPair:               sp.KeyPair,
+		SupportedGroup:        sp.SupportedGroup,
+		CipherSuite:           sp.CipherSuite,
+		SignatureAlgorithm:    sp.SignatureAlgorithm,
+		MaxCachedSessions:     sp.MaxCachedSessions,
+		CachedSessionLifetime: sp.CachedSessionLifetime,
+		PSK:                   sp.PSK,
+	}
+}
+
 // KeyPair clearly associates a Private and Public Key into a pair
 type KeyPair struct {
 	PrivateKey crypto.PrivateKey

@@ -1,44 +1,23 @@
 package taps
 
+type EventEmitter interface {
+	Events() <-chan Event
+}
+
 type Event interface{}
-
-type ErrorEvent struct {
-	Error error
-}
-
-type SentEvent struct {
-	MessageContext *MessageContext
-}
-
-type ExpiredEvent struct {
-	MessageContext *MessageContext
-}
-
-type SendErrorEvent struct {
-	Error          error
-	MessageContext *MessageContext
-}
-
-type SoftErrorEvent ErrorEvent
 
 type ReadyEvent struct{}
 
 type PathChangeEvent struct{}
 
-type ReceivedEvent struct {
-	MessageContext *MessageContext
-	MessageData    []byte
-}
+type StoppedEvent struct{}
 
-type ReceivedPartialEvent struct {
-	MessageContext *MessageContext
-	MessageData    []byte
-	EndOfMessage   bool
-}
+type RendezvousDoneEvent struct{}
 
-type ReceiveErrorEvent struct {
-	Error          error
-	MessageContext *MessageContext
+type ClosedEvent struct{}
+
+type ErrorEvent struct {
+	Error error
 }
 
 // ConnectionReceivedEvent is raised with a new Connection when a
@@ -51,12 +30,43 @@ type ConnectionReceivedEvent struct {
 	Connection *Connection
 }
 
-type StoppedEvent struct{}
+type SentEvent struct {
+	MessageContext *MessageContext
+}
 
-type RendezvousDoneEvent struct{}
+type MessageContextErrorEvent struct {
+	MessageContext *MessageContext
+	Error          error
+}
 
-type ClosedEvent struct{}
+type ReceivedEvent struct {
+	MessageContext *MessageContext
+	MessageData    []byte
+	EndOfMessage   bool
+}
 
-type EstablishmentErrorEvent ErrorEvent
+/*type ReceivedPartialEvent struct {
+	MessageContext *MessageContext
+	MessageData    []byte
+	EndOfMessage   bool
+        }*/
 
-type ConnectionErrorEvent ErrorEvent
+/*type ExpiredEvent struct {
+	MessageContext *MessageContext
+        }*/
+
+/*type SendErrorEvent struct {
+	Error          error
+	MessageContext *MessageContext
+        }*/
+
+//type SoftErrorEvent ErrorEvent
+
+/*type ReceiveErrorEvent struct {
+	Error          error
+	MessageContext *MessageContext
+        }*/
+
+//type EstablishmentErrorEvent ErrorEvent
+
+//type ConnectionErrorEvent ErrorEvent
