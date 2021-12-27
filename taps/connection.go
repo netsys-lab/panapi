@@ -5,8 +5,7 @@ import "github.com/netsys-lab/panapi/internal/enum"
 // Connection
 //
 type Connection struct {
-	Events chan Event
-	State  enum.ConnectionState
+	State enum.ConnectionState
 	// Need to keep track of ConnPrio Property separately from the
 	// other ConnectionProperties. Feedback welcome.
 	ConnPrio uint
@@ -66,26 +65,58 @@ func (c *Connection) SetProperty(property string, value interface{}) error {
 	return err
 }
 
-//
-func (c *Connection) Send(messageData []byte) {
-	c.SendContext(nil, messageData, true)
+// Send sends a message, blocks until sending has succeeded or
+// returns an error if sending was not successful. This error
+// represents either the "Expired" or "SendError" Events from
+// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-9.2.2
+func (c *Connection) Send(messageData []byte) error {
+	return c.SendContext(nil, messageData, true)
 }
 
-//
-func (c *Connection) SendContext(messageContext *MessageContext, messageData []byte, endOfMessage bool) {
-
+// SendContext sends a message with a specific, optional,
+// messageContext, and an endOfMessage flag that indicates whether,
+// for the purposes of the underlying transport, this message is
+// complete and can be sent. When endOfMessage is set, a call to this
+// function blocks until sending of the underlying data either
+// succeeded or returns an error if sending was not successful. This
+// error represents either the "Expired" or "SendError" Events from
+// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-9.2.2
+// If endOfMessage is unset, this function will return as soon as the
+// data could be handed off to an underlying queue and return an error
+// if not enough resources are available.
+func (c *Connection) SendContext(messageContext *MessageContext, messageData []byte, endOfMessage bool) error {
+	return nil
 }
 
-func (c *Connection) Receive() {
-
+func (c *Connection) Receive() (messageContext *MessageContext, messageData []byte, err error) {
+	err = NotYetImplementendError
+	return
 }
 
-func (c *Connection) Close() {
-
+func (c *Connection) Close() error {
+	return NotYetImplementendError
 }
 
-func (c *Connection) Abort() {
+// Ready blocks until a Connection created with Initiate() or
+// InitiateWithSend() transitions to Established state.
+func (c *Connection) Ready() error {
+	return NotYetImplementendError
+}
 
+func (c *Connection) Abort() error {
+	return NotYetImplementendError
+}
+
+// PathChange blocks until the underlying transport has signalled a
+// Path Change.
+func (c *Connection) PathChange() error {
+	return NotYetImplementendError
+}
+
+// Sent blocks until a message is sent, returning the messageContext
+// or an error if the message could not be delivered, e.g. when the message was not
+func (c *Connection) Sent() (messageContext *MessageContext, err error) {
+	return
 }
 
 /*

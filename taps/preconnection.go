@@ -66,7 +66,7 @@ func (p *Preconnection) Resolve() (les []*LocalEndpoint, res []*RemoteEndpoint) 
 // create another Listener.
 //
 // See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-7.2
-func (p *Preconnection) Listen() *Listener {
+func (p *Preconnection) Listen() (*Listener, error) {
 	return newListener(*p)
 }
 
@@ -74,17 +74,10 @@ func (p *Preconnection) Listen() *Listener {
 // Connection from the Remote Endpoint candidates, while also
 // simultaneously trying to establish a Connection from the Local
 // Endpoint candidates to the Remote Endpoint candidates.
-//
-// If a connection succeeds, it can be received from the returned
-// channel
-//
-// Deprecated: The function signature significantly departs from the
-// draft spec. Feedback welcome.
-//
 // See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-7.3
-func (p *Preconnection) Rendezvous() chan Connection {
+func (p *Preconnection) Rendezvous() (Connection, error) {
 	// TODO
-	return make(chan Connection)
+	return Connection{}, nil
 }
 
 // AddRemote can add RemoteEndpoints obtained via p.Resolve() to the
@@ -95,4 +88,8 @@ func (p *Preconnection) Rendezvous() chan Connection {
 // existing set of RemoteEndpoints configured in p. Feedback welcome.
 func (p *Preconnection) AddRemote([]*RemoteEndpoint) {
 	// TODO
+}
+
+func (p *Preconnection) Initiate() (Connection, error) {
+	return Connection{}, nil
 }

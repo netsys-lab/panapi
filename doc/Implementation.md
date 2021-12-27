@@ -31,6 +31,39 @@ https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-1.1 st
 > [...] for processing; the details of event processing are platform-
 > and implementation-specific.
 
+Finally, https://www.ietf.org/archive/id/draft-ietf-taps-arch-10.html#section-2.1 states:
+
+>  2.1. Event-Driven API
+>
+> Originally, sockets presented a blocking interface for establishing
+> connections and transferring data. However, most modern applications
+> interact with the network asynchronously. Emulation of an
+> asynchronous interface using sockets generally uses a try-and-fail
+> model. If the application wants to read, but data has not yet been
+> received from the peer, the call to read will fail. The application
+> then waits and can try again later.
+> 
+> In contrast to sockets, all interaction with a Transport Services
+> system is expected to be asynchronous, and use an event-driven model
+> (see Section 4.1.6). For example, if the application wants to read,
+> its call to read will not complete immediately, but will deliver an
+> event containing the received data once it is available. Error
+> handling is also asynchronous; a failure to send results in an
+> asynchronous send error as an event.
+>
+> The Transport Services API also delivers events regarding the
+> lifetime of a connection and changes in the available network links,
+> which were not previously made explicit in sockets.
+> 
+> Using asynchronous events allows for a more natural interaction model
+> when establishing connections and transferring data. Events in time
+> more closely reflect the nature of interactions over networks, as
+> opposed to how sockets represent network resources as file system
+> objects that may be temporarily unavailable.
+>
+> Separate from events, callbacks are also provided for asynchronous
+> interactions with the API not directly related to events on the
+> network or network interfaces.
 
 Consider the [server
 example](https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#name-server-example)
@@ -90,8 +123,9 @@ ConnChan := make(chan Connection)
 // 'Accept()'ed Connection to ConnChan
 go func() {
     // wait until Connection can be accepted
+    Connection := Listener.Accept()
     // and send it to the channel
-    ConnChan <-Listener.Accept()
+    ConnChan <- Connection
 }()
 
 // dispatch an asynchronous goroutine that waits for a 
@@ -109,18 +143,168 @@ go func() {
 // execution immediately resumes here
 ...
 ```
-NB: For clarity, the above example does not include typical error handling 
+
+For clarity, the above example does not include typical error
+handling. Also, the use of a channel to pass Connection objects is
+slight overkill in this case.  A "proper" implementation in idiomatic
+Go would rather look something like this:
+
+```Go
+listener, err := Preconnection.Listen()
+if err != nil {
+    // handle error, exit gracefully
+    log.Fatalf("Could not open listener: %s", err)
+}
+
+// server main loop
+for {
+    // block until a new connection is received
+    conn, err := Listener.Accept()
+    if err != nil {
+        // handle error
+        log.Printf("could not accept connection: %s", err)
+        // re-enter the server main loop from the top
+        continue
+    }
+
+    // dispatch goroutine to handle connection asynchronously
+    go func(c Connection) {
+        // wait until a complete Message can be received
+        messageDataRequest, messageContext := c.Receive()
+        // process message
+        ...
+    }(conn)
+}
+
+```
+
+I suspect, TAPS is specified as an event-based asynchronous API
+because most programming languages don't offer such high-level
+concurrency features, at least not on a comparable level of
+convenience.
+
+With this in mind, I have (tentatively) converged on an implementation
+strategy of a TAPS-like API in Go that is centered around *blocking*
+calls, which can nevertheless safely be put into asynchronous
+goroutines as needed. (For now,) I will simply not include any kind of
+event system, simultaneously throwing the associated requirements for
+handcrafted event types and necessarily idiosyncratic
+Error-handling. Instead, an application can selectively decide to
+"handle events" by calling the corresponding blocking function in an
+asynchronous goroutine and thereby stay informed about, e.g., path
+changes:
+
+```Go
+listener, err := Preconnection.Listen()
+if err != nil {
+    // handle error, exit gracefully
+    log.Fatalf("Could not open listener: %s", err)
+}
+
+// server main loop
+for {
+    // block until a new connection is received
+    conn, err := Listener.Accept()
+    if err != nil {
+        // handle error
+        log.Printf("could not accept connection: %s", err)
+        // re-enter the server main loop from the top
+        continue
+    }
+    
+    // dispatch goroutine to worry about the underlying 
+    // path changing for conn
+    go func(c Connection) {
+        // wait for a path change ocurring
+        info, err := c.PathChange()
+        if err != nil {
+            // handle error
+            if err == ErrClosed {
+                // connection closed without any path change
+            } else {
+                // some other error occured
+                log.Println("couldn't wait for path change", err)
+            }
+            return
+        }
+        // handle info
+        ...
+        
+    }(conn)
+
+    // dispatch goroutine to handle connection asynchronously
+    go func(c Connection) {
+        // wait until a complete Message can be received
+        messageDataRequest, messageContext := c.Receive()
+        // process message
+        ...
+    }(conn)
+}
+
+```
+
+### Events and blocking Functions covering them
+
+`func (*Connection) Send(message) error` covers the following Events:
+
+ - `Sent<messageContext>`: When `Send` returns no `error`
+ - `Expired<messageContext>`: When `Send` returns `ErrorExpired`
+ - `ConnectionError<>`: When `Send` returns an `error`, because the underlying `Connection` closed due to the `error`
+ - `SendError<messageContext, reason?>`: When `Send` returns any other `error`
+ 
+`func (*Connection) Receive() (message, error)` covers the following Events:
+ 
+ - `Received<messageData, messageContext>`: When `Receive` returns a `message` but no `error`
+ - `ReceivedPartial<messageData, messageContext, endOfMessage>`: When `Receive` returns a `message` and `PartialMessageError`
+ - `ConnectionError<>`: When `Receive` returns an `error`, because the underlying `Connection` closed due to the `error`
+ - `ReceiveError<messageContext, reason?>`: When `Receive` returns any other `error`
+
+`func (*Connection) Close() error` covers the following Events:
+
+ - `Closed<>`: When `Close` returns no `error`
+ - `ConnectionError<>`: When `Close` returns an `error`, because the underlying `Connection` closed due to the `error`
+
+`func (*Preconnection) Initiate() (Connection, error)` and `func(*Preconnection) Rendezvous()`(Connection, error)` cover the Events:
+
+ - `Ready<>`: When `Initiate()` or `Rendezvous()` return a `Connection` and no `error`
+ - `EstablishmentError<>`: When `Initiate()` returns an `error`
+ - `RendezvousDone<Connection>`: When `Rendezvous()` returns a `Connection` and no `error`
+
+`func (*Listener) Accept() (Connection, error)` covers the following Events:
+
+ - `ConnectionReceived<Connection>`: When `Accept` returns a Connection but no `error`
+ - `Stopped<>`: When `Accept` returns `StoppedError`
+ - `EstablishmentError<>`: When `Accept` returns any other `error`
+
+The following Events are covered by dedicated blocking functions for this purpose
+ 
+ - `SoftError<>`: covered by `func (*Connection) SoftError() error`
+ - `PathChange<>`: covered by `func (*Connection) PathChange() error`, returns an `error` if `Connection` closed without a Path Change
+
+Consider, e.g., the [`Stopped<>`
+Event](https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-7.2) from the TAPS draft:
+
+> A Stopped Event occurs after the Listener has stopped listening.
+
+How could this be reasonably mapped to a blocking function name?
+
+* `func Stopped()`
+* `func Stopped() error`
+* `func HasStopped() error`
+* `func Stopped(blocking bool) error`
+* `func IsStopped() bool
+* `func WaitStopped() error`
+
 
 ## Parameter Access and Type Safety
 
 
 
 
-
-
 ## Pre-Establishment
 
-https://www.ietf.org/archive/id/draft-ietf-taps-impl-10.html#section-3.1 states: 
+https://www.ietf.org/archive/id/draft-ietf-taps-impl-10.html#section-3.1
+states:
 
 > The Transport Services system should have a list of supported protocols available, which each have transport features reflecting the capabilities of the protocol. Once an application specifies its Transport Properties, the transport system matches the required and prohibited properties against the transport features of the available protocols.
 

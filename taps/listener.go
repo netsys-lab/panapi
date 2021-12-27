@@ -4,32 +4,32 @@ package taps
 //
 // See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-7.2
 type Listener struct {
-	events  chan Event
 	preConn Preconnection
 }
 
-func newListener(preConn Preconnection) *Listener {
-	//TODO make deep copy of preConn
+//
+func newListener(preConn Preconnection) (*Listener, error) {
+	if len(preConn.LocalEndpoints) == 0 {
+		return nil, NewEstablishmentError("can't create listener without at least 1 local endpoint")
+	}
 	l := Listener{
-		make(chan Event),
 		preConn,
 	}
-
-	if len(preConn.LocalEndpoints) == 0 {
-		l.events <- ErrorEvent{Error: NewEstablishmentError("can't create listener without at least 1 local endpoint")}
-		l.Stop()
-	}
-	return &l
+	return &l, nil
 }
 
-func (l *Listener) Events() <-chan Event {
-	return l.events
+func (l *Listener) Accept() (Connection, error) {
+	return Connection{}, NotYetImplementendError
 }
 
 // Stop sends the StoppedEvent and closes l's event channel
-func (l *Listener) Stop() {
-	l.events <- StoppedEvent{}
-	close(l.events)
+func (l *Listener) Stop() error {
+	return NotYetImplementendError
+}
+
+// Stopped blocks until the Listener l is stopped.
+func (l *Listener) Stopped() {
+
 }
 
 // SetNewConnectionLimit sets a cap on the number of inbound
