@@ -21,6 +21,16 @@ func NewLocalEndpoint() *LocalEndpoint {
 	return &LocalEndpoint{}
 }
 
+// Copy returns a new Endpoint struct with its values deeply copied from e
+func (e *Endpoint) Copy() *Endpoint {
+	return &Endpoint{
+		Address:   e.Address,
+		Transport: e.Transport,
+		Network:   e.Network,
+		Interface: e.Interface,
+	}
+}
+
 func (e *Endpoint) WithNetwork(network string) {
 	e.Network = network
 }

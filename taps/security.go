@@ -57,6 +57,7 @@ func (sp SecurityParameters) SetTrustVerificationCallback() {
 func (sp SecurityParameters) SetIdentityChallengeCallback() {
 }
 
+/*
 // Set stores value for parameter, which is stripped of case and
 // non-alphabetic characters before being matched against the (equally
 // stripped) exported Field names of sp. The type of value must be
@@ -81,6 +82,7 @@ func (sp SecurityParameters) SetIdentityChallengeCallback() {
 func (sp *SecurityParameters) Set(parameter string, value interface{}) error {
 	return set(sp, parameter, value)
 }
+*/
 
 // Copy returns a new SecurityParameters struct with its values deeply copied from sp
 func (sp *SecurityParameters) Copy() *SecurityParameters {

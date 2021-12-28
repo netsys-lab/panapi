@@ -47,6 +47,26 @@ func NewPreconnection(
 	}
 }
 
+// Copy returns a new Preconnection struct with its values deeply
+// copied from p
+func (p *Preconnection) Copy() *Preconnection {
+	locals := make([]*LocalEndpoint, len(p.LocalEndpoints))
+	for i := 0; i < len(p.LocalEndpoints); i += 1 {
+		locals[i] = &LocalEndpoint{*p.LocalEndpoints[i].Copy()}
+	}
+	remotes := make([]*RemoteEndpoint, len(p.RemoteEndpoints))
+	for i := 0; i < len(p.RemoteEndpoints); i += 1 {
+		remotes[i] = &RemoteEndpoint{*p.RemoteEndpoints[i].Copy()}
+	}
+
+	return &Preconnection{
+		LocalEndpoints:      locals,
+		RemoteEndpoints:     remotes,
+		TransportProperties: p.TransportProperties.Copy(),
+		SecurityParameters:  p.SecurityParameters.Copy(),
+	}
+}
+
 // Resolve called on a Preconnection p can be used by the application
 // to force early binding when required, for example with some Network
 // Address Translator (NAT) traversal protocols.
@@ -55,8 +75,8 @@ func NewPreconnection(
 // https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.1
 // and
 // https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-7.3
-func (p *Preconnection) Resolve() (les []*LocalEndpoint, res []*RemoteEndpoint) {
-	// TODO
+func (p *Preconnection) Resolve() (les []*LocalEndpoint, res []*RemoteEndpoint, err error) {
+	err = NotYetImplementendError
 	return
 }
 
@@ -67,7 +87,7 @@ func (p *Preconnection) Resolve() (les []*LocalEndpoint, res []*RemoteEndpoint) 
 //
 // See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-7.2
 func (p *Preconnection) Listen() (*Listener, error) {
-	return newListener(*p)
+	return newListener(*p.Copy())
 }
 
 // Rendezvous listens on the Local Endpoint candidates for an incoming
@@ -77,7 +97,7 @@ func (p *Preconnection) Listen() (*Listener, error) {
 // See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-7.3
 func (p *Preconnection) Rendezvous() (Connection, error) {
 	// TODO
-	return Connection{}, nil
+	return Connection{}, NotYetImplementendError
 }
 
 // AddRemote can add RemoteEndpoints obtained via p.Resolve() to the
@@ -85,11 +105,12 @@ func (p *Preconnection) Rendezvous() (Connection, error) {
 //
 // Deprecated: The spec is unclear why p.Resolve() should not modify p
 // directly. It is also unclear how calling AddRemote modifies the
-// existing set of RemoteEndpoints configured in p. Feedback welcome.
+// existing set of RemoteEndpoints configured in p. Are they
+// overwritten or merely appended to? Feedback welcome.
 func (p *Preconnection) AddRemote([]*RemoteEndpoint) {
 	// TODO
 }
 
 func (p *Preconnection) Initiate() (Connection, error) {
-	return Connection{}, nil
+	return Connection{}, NotYetImplementendError
 }

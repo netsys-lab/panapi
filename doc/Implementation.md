@@ -145,9 +145,10 @@ go func() {
 ```
 
 For clarity, the above example does not include typical error
-handling. Also, the use of a channel to pass Connection objects is
-slight overkill in this case.  A "proper" implementation in idiomatic
-Go would rather look something like this:
+handling. Also, in this case, asynchronously accepting connections
+makes little sense and the use of a channel to pass Connection objects
+is therefore slight overkill. "proper" implementation in idiomatic Go
+would rather look something like this:
 
 ```Go
 listener, err := Preconnection.Listen()
@@ -178,17 +179,17 @@ for {
 
 ```
 
-I suspect, TAPS is specified as an event-based asynchronous API
+We suspect that TAPS is specified as an event-based asynchronous API
 because most programming languages don't offer such high-level
 concurrency features, at least not on a comparable level of
 convenience.
 
-With this in mind, I have (tentatively) converged on an implementation
-strategy of a TAPS-like API in Go that is centered around *blocking*
-calls, which can nevertheless safely be put into asynchronous
-goroutines as needed. (For now,) I will simply not include any kind of
-event system, simultaneously throwing the associated requirements for
-handcrafted event types and necessarily idiosyncratic
+With this in mind, we have (tentatively) converged on an
+implementation strategy of our TAPS-like API in Go that is centered
+around *blocking* calls, which can nevertheless safely be put into
+asynchronous goroutines as needed. For now, we will simply not include
+any kind of event system, simultaneously getting rid of any associated
+requirements for handcrafted event types and necessarily idiosyncratic
 Error-handling. Instead, an application can selectively decide to
 "handle events" by calling the corresponding blocking function in an
 asynchronous goroutine and thereby stay informed about, e.g., path
@@ -216,18 +217,18 @@ for {
     // path changing for conn
     go func(c Connection) {
         // wait for a path change ocurring
-        info, err := c.PathChange()
+        err := c.PathChange()
         if err != nil {
             // handle error
             if err == ErrClosed {
                 // connection closed without any path change
             } else {
                 // some other error occured
-                log.Println("couldn't wait for path change", err)
+                log.Printf("while waiting for path change: %s", err)
             }
             return
         }
-        // handle info
+        // react to path change
         ...
         
     }(conn)
@@ -241,21 +242,34 @@ for {
     }(conn)
 }
 
-```
 
+
+```
 ### Events and blocking Functions covering them
 
-`func (*Connection) Send(message) error` covers the following Events:
+`func (*Preconnection) Initiate() (Connection, error)` and `func(*Preconnection) Rendezvous()`(Connection, error)` cover the Events:
+
+ - `Ready<>`: When `Initiate()` or `Rendezvous` return a `Connection` and no `error`
+ - `EstablishmentError<>`: When `Initiate` returns an `error`
+ - `RendezvousDone<Connection>`: When `Rendezvous` returns a `Connection` and no `error`
+
+`func (*Listener) Accept() (Connection, error)` covers the following Events:
+
+ - `ConnectionReceived<Connection>`: When `Accept` returns a Connection but no `error`
+ - `Stopped<>`: When `Accept` returns `StoppedError`
+ - `EstablishmentError<>`: When `Accept` returns any other `error`
+
+`func (*Connection) Send(Message) error` covers the following Events:
 
  - `Sent<messageContext>`: When `Send` returns no `error`
  - `Expired<messageContext>`: When `Send` returns `ErrorExpired`
  - `ConnectionError<>`: When `Send` returns an `error`, because the underlying `Connection` closed due to the `error`
  - `SendError<messageContext, reason?>`: When `Send` returns any other `error`
  
-`func (*Connection) Receive() (message, error)` covers the following Events:
+`func (*Connection) Receive() (Message, error)` covers the following Events:
  
- - `Received<messageData, messageContext>`: When `Receive` returns a `message` but no `error`
- - `ReceivedPartial<messageData, messageContext, endOfMessage>`: When `Receive` returns a `message` and `PartialMessageError`
+ - `Received<messageData, messageContext>`: When `Receive` returns a `Message` but no `error`
+ - `ReceivedPartial<messageData, messageContext, endOfMessage>`: When `Receive` returns a `Message` with the `EndOfMessage` flag set to `false`.
  - `ConnectionError<>`: When `Receive` returns an `error`, because the underlying `Connection` closed due to the `error`
  - `ReceiveError<messageContext, reason?>`: When `Receive` returns any other `error`
 
@@ -264,42 +278,45 @@ for {
  - `Closed<>`: When `Close` returns no `error`
  - `ConnectionError<>`: When `Close` returns an `error`, because the underlying `Connection` closed due to the `error`
 
-`func (*Preconnection) Initiate() (Connection, error)` and `func(*Preconnection) Rendezvous()`(Connection, error)` cover the Events:
-
- - `Ready<>`: When `Initiate()` or `Rendezvous()` return a `Connection` and no `error`
- - `EstablishmentError<>`: When `Initiate()` returns an `error`
- - `RendezvousDone<Connection>`: When `Rendezvous()` returns a `Connection` and no `error`
-
-`func (*Listener) Accept() (Connection, error)` covers the following Events:
-
- - `ConnectionReceived<Connection>`: When `Accept` returns a Connection but no `error`
- - `Stopped<>`: When `Accept` returns `StoppedError`
- - `EstablishmentError<>`: When `Accept` returns any other `error`
 
 The following Events are covered by dedicated blocking functions for this purpose
  
- - `SoftError<>`: covered by `func (*Connection) SoftError() error`
+ - `SoftError<>`: covered by `func (*Connection) SoftError() error`, returns an ICMP `error` if one is received on the underlying `Connection`
  - `PathChange<>`: covered by `func (*Connection) PathChange() error`, returns an `error` if `Connection` closed without a Path Change
 
-Consider, e.g., the [`Stopped<>`
-Event](https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-7.2) from the TAPS draft:
+This should completely cover all potential control flow patters that are enabled by the Events from the TAPS Spec.
 
-> A Stopped Event occurs after the Listener has stopped listening.
+## Property/Parameter Access and Type Safety
 
-How could this be reasonably mapped to a blocking function name?
+To manage Properties, we decided to use Go-native struct fields
+instead of more error-prone string-based approaches.
 
-* `func Stopped()`
-* `func Stopped() error`
-* `func HasStopped() error`
-* `func Stopped(blocking bool) error`
-* `func IsStopped() bool
-* `func WaitStopped() error`
+While it _is_ possible to access struct fields using strings in Go,
+the process has some overhead and ignores the benefits of Go's static
+type system "in favor of" unneccessary runtime errors. Using
+reflection, it _would_ be possible to have fuzzy string matching
+against struct field names. A `Set` function could store a value for a
+property name, which is stripped of case and non-alphabetic characters
+before being matched against the (equally stripped) exported field
+names of the struct. The type of value can be checked for
+"assignability" to the type of the targeted property field and
+otherwise return an error. This function would allow you to say:
 
+```Go
+tp := NewTransportProperties()
+err := tp.Set("preserve-msg-boundaries", Require)
+if err != nil {
+    ... // handle runtime error
+}
+```
+In idiomatic Go, you would (and should) instead say:
 
-## Parameter Access and Type Safety
+```
+tp.PreserveMsgBoundaries = Require
+```
 
-
-
+For this reason, and to keep the API as concise as possible, we
+have currently disabled `Get`ing and `Set`ing Properties via strings.
 
 ## Pre-Establishment
 
@@ -311,8 +328,3 @@ states:
 Our core implementation does _not_ itself provide a list of supported protocols directly. Instead, the applications must explicitly import the corresponding library for each protocol option. These must then be "registered" with the core system, before property matching can occur.
 
 It is of course possible to bundle a sane default selection of protocol libraries into a single "meta" library that can be imported instead.
-
-
-## Events
-
-The event-driven nature of the spec does not directly translate into idiomatic Go. 

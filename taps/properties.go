@@ -6,6 +6,7 @@ import (
 	"github.com/netsys-lab/panapi/internal/enum"
 )
 
+// TransportProperties (TODO: rename to SelectionProperties)
 type TransportProperties struct {
 	// Reliability pecifies whether the application needs to use a
 	// transport protocol that ensures that all data is received
@@ -260,7 +261,7 @@ func (tp *TransportProperties) Copy() *TransportProperties {
 	}
 }
 
-// Set stores value for property, which is stripped of case and
+// set stores value for property, which is stripped of case and
 // non-alphabetic characters before being matched against the (equally
 // stripped) exported Field names of tp. The type of value must be
 // assignable to type of the targeted property Field, otherwise an
@@ -281,7 +282,7 @@ func (tp *TransportProperties) Copy() *TransportProperties {
 // function is implemented using reflection and dynamic string
 // matching, which is inherently inefficient and prone to bugs
 // triggered at runtime.
-func (tp *TransportProperties) Set(property string, value interface{}) error {
+func (tp *TransportProperties) set(property string, value interface{}) error {
 	return set(tp, property, value)
 }
 
@@ -290,8 +291,8 @@ func (tp *TransportProperties) Set(property string, value interface{}) error {
 //
 // Deprecated: This is equivalent to calling tp.Set(property, Require) - the caveats
 // of func tp.Set apply in full
-func (tp *TransportProperties) Require(property string) error {
-	return tp.Set(property, Require)
+func (tp *TransportProperties) require(property string) error {
+	return tp.set(property, Require)
 }
 
 // Prefer has the effect of prefering protocols/paths providing the
@@ -299,16 +300,16 @@ func (tp *TransportProperties) Require(property string) error {
 //
 // Deprecated: This is equivalent to calling tp.Set(property, Prefer) - the caveats
 // of func tp.Set apply in full
-func (tp *TransportProperties) Prefer(property string) error {
-	return tp.Set(property, Prefer)
+func (tp *TransportProperties) prefer(property string) error {
+	return tp.set(property, Prefer)
 }
 
 // Ignore has the effect of expressing no preference for the given property
 //
 // Deprecated: This is equivalent to calling tp.Set(property, Ignore) - the caveats
 // of func tp.Set apply in full
-func (tp *TransportProperties) Ignore(property string) error {
-	return tp.Set(property, Ignore)
+func (tp *TransportProperties) ignore(property string) error {
+	return tp.set(property, Ignore)
 
 }
 
@@ -317,8 +318,8 @@ func (tp *TransportProperties) Ignore(property string) error {
 //
 // Deprecated: This is equivalent to calling tp.Set(property, Avoid) - the caveats
 // of func tp.Set apply in full
-func (tp *TransportProperties) Avoid(property string) error {
-	return tp.Set(property, Avoid)
+func (tp *TransportProperties) avoid(property string) error {
+	return tp.set(property, Avoid)
 }
 
 // Prohibit has the effect of failing if the property can not be
@@ -326,8 +327,8 @@ func (tp *TransportProperties) Avoid(property string) error {
 //
 // Deprecated: This is equivalent to calling tp.Set(property, Prohibit) - the
 // caveats of func tp.Set apply in full
-func (tp *TransportProperties) Prohibit(property string) error {
-	return tp.Set(property, Prohibit)
+func (tp *TransportProperties) prohibit(property string) error {
+	return tp.set(property, Prohibit)
 }
 
 type ConnectionProperties struct {
@@ -510,7 +511,7 @@ func (cp *ConnectionProperties) RecvMsgMaxLen() uint {
 // preferred. This function is implemented using reflection and
 // dynamic string matching, which is inherently inefficient and prone
 // to bugs triggered at runtime.
-func (cp *ConnectionProperties) Get(property string) (value interface{}, err error) {
+func (cp *ConnectionProperties) get(property string) (value interface{}, err error) {
 	v, err := get(cp, property)
 	return v.Interface(), err
 }
