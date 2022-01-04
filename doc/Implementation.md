@@ -12,12 +12,12 @@ agreed-upon "best practices", have caused the community of Go
 developers to converge on a coding style consensus that we now usually
 refer to as "idiomatic Go".
 
-Some conflicts exist between the TAPS specifications on the one hand
-and our implementation on the other. We are not sure of the severity
+Some conflicts exist between the TAPS specifications on one hand
+and our implementation on the other hand. We are not sure of the severity
 in each case, but wish to point out any departures from the TAPS
 vision here.
 
-## Asnychronous, Event-driven Interaction Patterns
+## Asynchronous, Event-driven Interaction Patterns
 
 https://www.ietf.org/archive/id/draft-ietf-taps-impl-10.html#abstract states:
 
@@ -105,7 +105,7 @@ In Go, _asynchronous_ processing is usually implemented
 explicitly on the application side using Go's native concurrency
 primitives as needed.
 
-Applications that can not afford to halt execution to wait for a
+Applications that cannot afford to halt execution to wait for a
 blocking function call to succeed would simply dispatch that call in a
 concurrent goroutine and read the eventual result from a channel
 constructed for that purpose.
@@ -147,7 +147,7 @@ go func() {
 For clarity, the above example does not include typical error
 handling. Also, in this case, asynchronously accepting connections
 makes little sense and the use of a channel to pass Connection objects
-is therefore slight overkill. "proper" implementation in idiomatic Go
+is therefore slight overkill. "Proper" implementation in idiomatic Go
 would rather look something like this:
 
 ```Go
