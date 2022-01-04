@@ -9,9 +9,7 @@ PANAPI is an early [research](https://dl.acm.org/doi/10.1145/3472727.3472808) im
 _In this development branch of the repository, the depreceated old API from the
 [main branch](https://github.com/netsys-lab/panapi) is being replaced
 by a more faithful implementation of the [current TAPS API specification](https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html).
-This work is currently still in mockup stage. See [here](doc/Implementation.md) for a detailled discussion of our particular design choices. A first impression of the Go package structure can be found here:__
-
-[![Go Reference](https://pkg.go.dev/badge/github.com/netsys-lab/panapi.svg)](https://pkg.go.dev/github.com/netsys-lab/panapi@v0.3.0-alpha7/taps)
+This work is currently still in mockup stage._ **See [here](doc/Implementation.md) for a detailled discussion of our particular design choices.** _A first impression of the Go package structure can be found here: [![Go Reference](https://pkg.go.dev/badge/github.com/netsys-lab/panapi.svg)](https://pkg.go.dev/github.com/netsys-lab/panapi@v0.3.0-alpha7/taps)_
 
 
 
