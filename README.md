@@ -1,65 +1,19 @@
-# PANAPI -- Work In Progress
-
+# PANAPI - Work in Progress
 [![Go](https://github.com/netsys-lab/panapi/actions/workflows/go.yml/badge.svg)](https://github.com/netsys-lab/panapi/actions/workflows/go.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/netsys-lab/panapi)](https://goreportcard.com/report/github.com/netsys-lab/panapi) 
-[![Go Reference](https://pkg.go.dev/badge/github.com/netsys-lab/panapi.svg)](https://pkg.go.dev/github.com/netsys-lab/panapi)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 PANAPI is an early [research](https://dl.acm.org/doi/10.1145/3472727.3472808) implementation of a next-generation networking [API to the transport layer](https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html). The latter is currently under development in the IETF [TAPS working group](https://datatracker.ietf.org/wg/taps/about/). PANAPI is an [EU-funded](https://pointer.ngi.eu/) open-source project, that adds support for the [SCION network architecture](https://scion-architecture.net/) to a general purpose TAPS-like networking API.
 
-## `import "panapi"` - The PANAPI Library
+## Development branch
 
-* [x] Simple working code example, see [examples/concurrent/README.md](examples/concurrent/README.md)
-* [ ] Add more code examples
+_In this development branch of the repository, the depreceated old API from the
+[main branch](https://github.com/netsys-lab/panapi) is being replaced
+by a more faithful implementation of the [current TAPS API specification](https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html).
+This work is currently still in mockup stage. See [here](doc/Implementation.md) for a detailled discussion of our particular design choices. A first impression of the Go package structure can be found here:__
 
-## `cmd/daemon` - The PANAPI Daemon
-
-* [x] applications selecting SCION as transport benefit from daemon running in the backend
-* [x] Graceful fallback to default behavior when daemon not running
-* [x] Expose Quic performance monitoring via RPC to Lua script executed by Daemon
-* [ ] Create dedicated daemon README
-* [x] Lua scripting examples 
-  * [x] [cmd/daemon/simple.lua](cmd/daemon/simple.lua)
-  * [x] [cmd/daemon/pathselection.lua](cmd/daemon/pathselection.lua)
-  * [x] [cmd/daemon/selector_with_stats.lua](cmd/daemon/selector_with_stats.lua)
+[![Go Reference](https://pkg.go.dev/badge/github.com/netsys-lab/panapi.svg)](https://pkg.go.dev/github.com/netsys-lab/panapi@v0.3.0-alpha7/taps)
 
 
-## Protocol support
-
-- [x] TCP/IP support
-- [x] QUIC/IP support
-- [ ] UDP/IP support (_currently broken_)
-- [x] QUIC/SCION support
-- [ ] UDP/SCION support (_currently broken_)
-
-## Features
-
-### Path selection
-
-- [x] Scriptable path selector, implementing `pan.Selector`
-  - [x] working Lua Data model
-  - [x] working path ranking
-- [x] Central path selection Daemon
-
-### Path quality
-
-- [x] Passive throughput monitoring
-- [x] Exposed to Lua script
-
-### Convenience features
-- [ ] Different log levels
-
-### Other
-- [ ] Full test coverage
-- [ ] Code Documentation
-- [ ] Move scripting selector to `/pkg` such that it could be used without the rest of PANAPI
-
-## Ported Applications
-- [x] `spate` traffic generator
-- [x] `concurrent` code example client/server timestamp echoing
-- [ ] `http`
-  - [ ] server
-  - [ ] client
 
 ## Affiliations
 
