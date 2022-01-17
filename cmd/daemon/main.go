@@ -53,6 +53,9 @@ func main() {
 	}
 	log.Println("Starting daemon")
 
+	// remove the underlying socket file on close
+	l.SetUnlinkOnClose(true)
+
 	if cpulog != "" {
 		f, err := os.Create(cpulog)
 		if err != nil {

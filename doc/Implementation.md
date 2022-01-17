@@ -14,10 +14,10 @@ refer to as "idiomatic Go".
 
 Some conflicts exist between the TAPS specifications on the one hand
 and our implementation on the other. We are not sure of the severity
-in each case, but wish to point out any departures from the TAPS
+in each case, but wish to discuss potential departures from the TAPS
 vision here.
 
-## Asnychronous, Event-driven Interaction Patterns
+## Asynchronous Interaction Patterns, not necessarily Event-driven
 
 https://www.ietf.org/archive/id/draft-ietf-taps-impl-10.html#abstract states:
 
@@ -147,7 +147,7 @@ go func() {
 For clarity, the above example does not include typical error
 handling. Also, in this case, asynchronously accepting connections
 makes little sense and the use of a channel to pass Connection objects
-is therefore slight overkill. "proper" implementation in idiomatic Go
+is therefore slight overkill. A "proper" implementation in idiomatic Go
 would rather look something like this:
 
 ```Go
@@ -179,8 +179,8 @@ for {
 
 ```
 
-We suspect that TAPS is specified as an event-based asynchronous API
-because most programming languages don't offer such high-level
+We suspect that TAPS is specified as an event-based asynchronous API,
+mainly because most programming languages don't offer such high-level
 concurrency features, at least not on a comparable level of
 convenience.
 
@@ -255,7 +255,7 @@ for {
 
 `func (*Listener) Accept() (Connection, error)` covers the following Events:
 
- - `ConnectionReceived<Connection>`: When `Accept` returns a Connection but no `error`
+ - `ConnectionReceived<Connection>`: When `Accept` returns a `Connection` but no `error`
  - `Stopped<>`: When `Accept` returns `StoppedError`
  - `EstablishmentError<>`: When `Accept` returns any other `error`
 
@@ -284,7 +284,9 @@ The following Events are covered by dedicated blocking functions for this purpos
  - `SoftError<>`: covered by `func (*Connection) SoftError() error`, returns an ICMP `error` if one is received on the underlying `Connection`
  - `PathChange<>`: covered by `func (*Connection) PathChange() error`, returns an `error` if `Connection` closed without a Path Change
 
-This should completely cover all potential control flow patters that are enabled by the Events from the TAPS Spec.
+Taken together, these blocking functions should cover most if not all
+potential control flow patters that are enabled by the Event system
+specified in the TAPS Spec.
 
 ## Property/Parameter Access and Type Safety
 
@@ -293,13 +295,13 @@ instead of more error-prone string-based approaches.
 
 While it _is_ possible to access struct fields using strings in Go,
 the process has some overhead and ignores the benefits of Go's static
-type system "in favor of" unneccessary runtime errors. Using
+type system "in favor of" unnecessary runtime errors. Using
 reflection, it _would_ be possible to have fuzzy string matching
 against struct field names. A `Set` function could store a value for a
 property name, which is stripped of case and non-alphabetic characters
 before being matched against the (equally stripped) exported field
 names of the struct. The type of value can be checked for
-"assignability" to the type of the targeted property field and
+"assign-ability" to the type of the targeted property field and
 otherwise return an error. This function would allow you to say:
 
 ```Go
