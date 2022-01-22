@@ -22,6 +22,7 @@ import (
 
 	"github.com/lucas-clemente/quic-go/logging"
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
+	"github.com/netsys-lab/panapi/oracle"
 )
 
 type ServerConnectionTracer interface {
@@ -184,6 +185,7 @@ func (c *ConnectionTracerClient) StartedConnection(local, remote net.Addr, srcCo
 	msg.SrcConnID = &srcConnID
 	msg.DestConnID = &destConnID
 
+	oracle.GetInstance().OnConnectionStarted(c.local, c.remote)
 	err := c.rpc.Call("ConnectionTracerServer.StartedConnection",
 		msg,
 		&NilMsg{},
@@ -212,6 +214,7 @@ func (c *ConnectionTracerClient) ClosedConnection(e error) {
 	s := e.Error()
 	msg := c.new_msg()
 	msg.ErrorMsg = &s
+	oracle.GetInstance().OnConnectionClosed(c.local, c.remote)
 	err := c.rpc.Call("ConnectionTracerServer.ClosedConnection",
 		msg,
 		&NilMsg{},
@@ -263,6 +266,7 @@ func (c *ConnectionTracerClient) SentPacket(hdr *logging.ExtendedHeader, size lo
 	msg.ByteCount = size
 	msg.AckFrame = ack
 	//msg.Frames = frames
+	oracle.GetInstance().OnPacketSent(c.local, c.remote, size)
 	err := c.rpc.Call("ConnectionTracerServer.SentPacket",
 		msg,
 		&NilMsg{},
@@ -303,6 +307,7 @@ func (c *ConnectionTracerClient) ReceivedPacket(hdr *logging.ExtendedHeader, siz
 	msg.ExtendedHeader = hdr
 	msg.ByteCount = size
 	//msg.Frames = frames
+	oracle.GetInstance().OnPacketReceived(c.local, c.remote, size)
 	err := c.rpc.Call("ConnectionTracerServer.ReceivedPacket",
 		msg,
 		&NilMsg{},

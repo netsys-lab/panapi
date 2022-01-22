@@ -19,6 +19,7 @@ import (
 	"net"
 
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
+	"github.com/netsys-lab/panapi/oracle"
 )
 
 var (
@@ -206,7 +207,9 @@ func (s *SelectorClient) Path() *pan.Path {
 		s.l.Fatalln(err)
 	}
 	if msg.Fingerprint != nil {
-		return s.paths[*msg.Fingerprint]
+		path := s.paths[*msg.Fingerprint]
+		oracle.GetInstance().OnPathEvaluated(s.local, s.remote, path)
+		return path
 	}
 	return nil
 }
