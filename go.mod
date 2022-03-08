@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d
+	github.com/docker/go-units v0.4.0
 	github.com/fatih/color v1.9.0
 	github.com/lucas-clemente/quic-go v0.24.0
 	github.com/netsec-ethz/scion-apps v0.4.1-0.20211203140009-c26494e4652f

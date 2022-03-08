@@ -65,7 +65,7 @@ type oracleReport struct {
 
 // TODO: dicover path oracle
 const oracleLocation = "19-ffaa:1:e4b,[127.0.0.1]:443"
-const oracleStatsEndpointFormat = "http://" + oracleLocation + "/stats/%s/%s/%s/%s/%s"
+const oracleStatsEndpointFormat = "http://" + oracleLocation + "/stats/%s/%s/%s/%s/%s/"
 
 const jsonContentType = "application/json"
 
@@ -166,8 +166,10 @@ func (c *Client) getOracleReport(local, remote *pan.UDPAddr) *oracleReport {
 		Stats: stats{},
 	}
 	lifetime := s.LifeTime()
+
 	if lifetime > 0 {
 		report.Stats.Bandwidth = float64(s.BytesSent) / lifetime.Seconds()
+		log.Printf("reporting bandwidth of: %.2f bytes/s\n", report.Stats.Bandwidth)
 	}
 	return &report
 }
