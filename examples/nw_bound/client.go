@@ -8,16 +8,13 @@ import (
 	"time"
 )
 
-func runClient(net, transport, remote, script string, size int64) error {
+func runClient(net, transport, remote string, size int64) error {
 	remoteEndpoint := panapi.NewRemoteEndpoint()
 	remoteEndpoint.WithNetwork(net)
 	remoteEndpoint.WithAddress(remote)
 	remoteEndpoint.WithTransport(transport)
 
 	transportProps := network.NewTransportProperties()
-	if script != "" {
-		transportProps.Set("lua-script", script)
-	}
 
 	pcon, err := panapi.NewPreconnection(remoteEndpoint, transportProps)
 	if err != nil {

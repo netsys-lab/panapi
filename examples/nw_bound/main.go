@@ -10,7 +10,7 @@ import (
 func main() {
 
 	var (
-		net, transport, mode, listenAddr, remoteAddr, script, sizeHuman string
+		net, transport, mode, listenAddr, remoteAddr, sizeHuman string
 	)
 
 	// common flags
@@ -24,7 +24,6 @@ func main() {
 
 	// client-only flags
 	flag.StringVar(&remoteAddr, "remoteAddr", "", "[Client] Server's Address (e.g. 17-ffaa:1:1,[127.0.0.1]:1337 or 192.0.2.1:1337, depending on chosen network type)")
-	flag.StringVar(&script, "script", "", "[Client] Lua script for path selection")
 
 	flag.Parse()
 	size, err := units.FromHumanSize(sizeHuman)
@@ -39,7 +38,7 @@ func main() {
 			log.Fatalf("Error running server: %s", err)
 		}
 	case "client":
-		err := runClient(net, transport, remoteAddr, script, size)
+		err := runClient(net, transport, remoteAddr, size)
 		if err != nil {
 			log.Fatalf("Error running client: %s", err)
 		}
