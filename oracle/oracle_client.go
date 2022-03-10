@@ -63,9 +63,12 @@ type oracleReport struct {
 	Path  pan.Path `json:"path"`
 }
 
-// TODO: dicover path oracle
-const oracleLocation = "19-ffaa:1:e4b,[127.0.0.1]:443"
-const oracleStatsEndpointFormat = "http://" + oracleLocation + "/stats/%s/%s/%s/%s/%s/"
+const (
+	// TODO: discover path oracle via RAINS
+	oracleLocation = "19-ffaa:1:e4b,127.0.0.1:443"
+	reportingURL   = "http://" + oracleLocation + "/stats/%s/%s/%s/"
+	scoringURL     = "http://" + oracleLocation + "/scorings/"
+)
 
 const jsonContentType = "application/json"
 
@@ -73,7 +76,8 @@ var instance *Client
 
 type Client struct {
 	*http.Client
-	stats map[string]map[string]*ConnectionStats // local -> remote -> stats
+	stats            map[string]map[string]*ConnectionStats // local -> remote -> stats
+	subscribedScores subscribedScores
 }
 
 var once sync.Once
@@ -88,8 +92,9 @@ func GetInstance() *Client {
 
 func create() *Client {
 	return &Client{
-		Client: &http.Client{Transport: shttp.DefaultTransport},
-		stats:  make(map[string]map[string]*ConnectionStats)}
+		Client:           &http.Client{Transport: shttp.DefaultTransport},
+		stats:            make(map[string]map[string]*ConnectionStats),
+		subscribedScores: make(subscribedScores)}
 }
 
 func (c *Client) OnConnectionStarted(local, remote *pan.UDPAddr) {
@@ -106,7 +111,7 @@ func (c *Client) OnConnectionClosed(local, remote *pan.UDPAddr) {
 	s := c.stats[local.String()][remote.String()]
 	now := time.Now()
 	s.Closed = &now
-	c.reportToOracle(local, remote)
+	c.reportStats(local, remote)
 }
 
 func (c *Client) OnPacketSent(local, remote *pan.UDPAddr, pktSize logging.ByteCount) {
@@ -130,13 +135,17 @@ func (c *Client) OnPathEvaluated(local, remote *pan.UDPAddr, newPath *pan.Path) 
 	s.ActivePath = newPath
 }
 
-func (c *Client) reportToOracle(local, remote *pan.UDPAddr) error {
-	return c.postToOracle(c.getOracleReport(local, remote))
+func (c *Client) Subscribe(dst pan.IA, service scoringServiceName) (*scoreResponse, error) {
+	c.subscribedScores[dst.String()] = append(c.subscribedScores[dst.String()], service)
+	return c.fetchScores()
 }
 
-func (c *Client) postToOracle(report *oracleReport) error {
-	reqUrl := fmt.Sprintf(oracleStatsEndpointFormat, report.Src.I.String(),
-		strconv.FormatInt(int64(report.Src.A), 10),
+func (c *Client) reportStats(local, remote *pan.UDPAddr) error {
+	return c.postReport(c.createReport(local, remote))
+}
+
+func (c *Client) postReport(report *oracleReport) error {
+	reqUrl := fmt.Sprintf(reportingURL,
 		report.Dst.I.String(),
 		strconv.FormatInt(int64(report.Dst.A), 10),
 		report.Path.Fingerprint)
@@ -157,7 +166,7 @@ func (c *Client) postToOracle(report *oracleReport) error {
 	return nil
 }
 
-func (c *Client) getOracleReport(local, remote *pan.UDPAddr) *oracleReport {
+func (c *Client) createReport(local, remote *pan.UDPAddr) *oracleReport {
 	s := c.stats[local.String()][remote.String()]
 	report := oracleReport{
 		Src:   s.Local.IA,
@@ -165,11 +174,33 @@ func (c *Client) getOracleReport(local, remote *pan.UDPAddr) *oracleReport {
 		Path:  *s.ActivePath,
 		Stats: stats{},
 	}
-	lifetime := s.LifeTime()
 
-	if lifetime > 0 {
+	if lifetime := s.LifeTime(); lifetime > 0 {
 		report.Stats.Bandwidth = float64(s.BytesSent) / lifetime.Seconds()
 		log.Printf("reporting bandwidth of: %.2f bytes/s\n", report.Stats.Bandwidth)
 	}
 	return &report
+}
+
+func (c *Client) fetchScores() (*scoreResponse, error) {
+	scoreReq, err := json.Marshal(scoreRequest{c.subscribedScores})
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := c.Post(scoringURL, jsonContentType, bytes.NewBuffer(scoreReq))
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	scores := &scoreResponse{}
+	if err = parseJson(res, scores); err != nil {
+		return nil, err
+	}
+	return scores, nil
+}
+
+func parseJson(response *http.Response, target interface{}) error {
+	return json.NewDecoder(response.Body).Decode(target)
 }

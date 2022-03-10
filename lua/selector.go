@@ -15,6 +15,7 @@ package lua
 
 import (
 	"fmt"
+	"github.com/netsys-lab/panapi/oracle"
 	"log"
 	"time"
 
@@ -212,6 +213,14 @@ func (s *LuaSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) e
 	s.state.clear_addr(remote)
 	lpaths := s.set_paths(remote, paths)
 
+	// TODO: make call async
+	scores, err := oracle.GetInstance().Subscribe(remote.IA, "bandwidth_v2")
+	if err != nil {
+		log.Printf("error fetching oracle scores: %s", err)
+	}
+	lscores := oracle.ScoresToLuaTable(scores)
+	oracle.InjectPathRefs(lscores, lpaths)
+
 	//call the "setpaths" function in the Lua script
 	//with two arguments
 	//and don't expect a return value
@@ -224,6 +233,7 @@ func (s *LuaSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) e
 		lua.LString(local.String()),
 		lua.LString(remote.String()),
 		lua_table_slice_to_table(lpaths),
+		lscores,
 	)
 
 }
