@@ -27,39 +27,51 @@ end
 -- not directly referenced from go
 paths = {}
 
--- global "scores database variable", used to reference scores fetched from a path oracle
--- not directly referenced from go
-scores = {}
-
-print("Loading SelectionServer - selecting the path with highest oracle score for a connection")
+math.randomseed(os.time())
+print("Loading SelectionServer - selecting a path with the lowest amount of hops for a connection")
 
 function rankpaths(raddr)
+   panapi.Log("Ranking paths for ", raddr)
+
+   -- sort by amount of hops
    table.sort(
-           scores[GetAsOfAddr(raddr)],
-           function(path_a, path_b)
-              return path_a.Scores.bandwidth_v2 < path_b.Scores.bandwidth_v2
+           paths[raddr],
+           function(a, b)
+              return #paths[a].Metadata.Interfaces < #paths[b].Metadata.Interfaces
            end
    )
+
+   if #paths[raddr] == 1 then
+      return
+   end
+
+   -- shuffle all paths with the lowest amount of hops
+   local index_last_path_with_min_hops
+   for i = 1, #paths[raddr], 1 do
+      if #paths[raddr][i].Interfaces > #paths[raddr][1].Interfaces then
+         index_last_path_with_min_hops = i - 1
+         break
+      end
+   end
+
+   for i = index_last_path_with_min_hops, 2, -1 do
+      local j = math.random(i)
+      paths[raddr][i], paths[raddr][j] = paths[raddr][j], paths[raddr][i]
+   end
 end
 
 -- gets called when a set of paths to addr is known
 function panapi.Initialize(laddr, raddr, ps, sc)
    panapi.Log("Initialize - abc", laddr, raddr)
    paths[raddr] = ps
-   scores = sc
    rankpaths(raddr)
 end
 
 -- gets called for every packet
 -- implementation needs to be efficient
 function panapi.Path(laddr, raddr)
-   local ras = GetAsOfAddr(raddr)
-   if #scores[ras] > 0 then
-      panapi.Log("using path chosen by using dynmaic path metadata: ", scores[ras][1].Fingerprint)
-      return scores[ras][1].PathRef
-   end
-
    if #paths[raddr] > 0 then
+      panapi.Log("Path for ", raddr, " ", paths[raddr][1].Fingerprint)
       return paths[raddr][1]
    end
 end

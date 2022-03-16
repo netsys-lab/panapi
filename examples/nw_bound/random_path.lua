@@ -27,39 +27,32 @@ end
 -- not directly referenced from go
 paths = {}
 
--- global "scores database variable", used to reference scores fetched from a path oracle
--- not directly referenced from go
-scores = {}
+math.randomseed(os.time())
+print("Loading SelectionServer - selecting a random path for a connection")
 
-print("Loading SelectionServer - selecting the path with highest oracle score for a connection")
-
+-- shuffles all paths for the remote address
 function rankpaths(raddr)
-   table.sort(
-           scores[GetAsOfAddr(raddr)],
-           function(path_a, path_b)
-              return path_a.Scores.bandwidth_v2 < path_b.Scores.bandwidth_v2
-           end
-   )
+   panapi.Log("Ranking paths for ", raddr)
+
+   -- https://stackoverflow.com/questions/35572435/how-do-you-do-the-fisher-yates-shuffle-in-lua
+   for i = #paths[raddr], 2, -1 do
+      local j = math.random(i)
+      paths[raddr][i], paths[raddr][j] = paths[raddr][j], paths[raddr][i]
+   end
 end
 
 -- gets called when a set of paths to addr is known
 function panapi.Initialize(laddr, raddr, ps, sc)
    panapi.Log("Initialize - abc", laddr, raddr)
    paths[raddr] = ps
-   scores = sc
    rankpaths(raddr)
 end
 
 -- gets called for every packet
 -- implementation needs to be efficient
 function panapi.Path(laddr, raddr)
-   local ras = GetAsOfAddr(raddr)
-   if #scores[ras] > 0 then
-      panapi.Log("using path chosen by using dynmaic path metadata: ", scores[ras][1].Fingerprint)
-      return scores[ras][1].PathRef
-   end
-
    if #paths[raddr] > 0 then
+      panapi.Log("Path for ", raddr, " ", paths[raddr][1].Fingerprint)
       return paths[raddr][1]
    end
 end
