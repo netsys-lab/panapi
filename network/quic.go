@@ -46,7 +46,7 @@ func (c *QUIC) Send(message Message) error {
 func (c *QUIC) Receive(message Message) error {
 	_, err := io.Copy(message, c.stream)
 	if err == EOM {
-		// End Of Message, not an error we need to propergate beyond this point
+		// End Of Message, not an error we need to propagate beyond this point
 		err = nil
 	}
 	return err

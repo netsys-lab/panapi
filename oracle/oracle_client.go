@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/docker/go-units"
 	"github.com/lucas-clemente/quic-go/logging"
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 	"github.com/netsec-ethz/scion-apps/pkg/shttp"
@@ -177,7 +178,7 @@ func (c *Client) createReport(local, remote *pan.UDPAddr) *oracleReport {
 
 	if lifetime := s.LifeTime(); lifetime > 0 {
 		report.Stats.Bandwidth = float64(s.BytesSent) / lifetime.Seconds()
-		log.Printf("reporting bandwidth of: %.2f bytes/s\n", report.Stats.Bandwidth)
+		log.Printf("reporting bandwidth of: %s \n", units.BytesSize(report.Stats.Bandwidth))
 	}
 	return &report
 }
