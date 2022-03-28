@@ -157,6 +157,8 @@ type MessageContext struct {
 
 	localEndpoint  *LocalEndpoint
 	remoteEndpoint *RemoteEndpoint
+
+	framers map[Framer]map[string]interface{}
 }
 
 func NewMessageContext() *MessageContext {

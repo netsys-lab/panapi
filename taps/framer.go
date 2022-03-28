@@ -1,22 +1,102 @@
 package taps
 
 import (
-	"fmt"
+	"bufio"
+	"bytes"
 	"io"
-	"net/http"
 )
+
+/*type MessageFramer struct {
+}
+
+func (f *MessageFramer) Start() (*Connection, error) {
+
+}
+
+func (f *MessageFramer) Stop() (*Connection, error) {
+
+  }
 
 type Framer interface {
 	Encode(kv map[string]interface{}, dst io.Writer, src io.Reader) (written int64, err error)
 	Decode(kv map[string]interface{}, dst io.Writer, src io.Reader) (written int64, err error)
+        }*/
+
+type FrameSender interface {
+	SendFrame(messageData []byte, messageContext *MessageContext) error
 }
 
-//
-type HTTPMessageFramer struct {
+type FrameReceiver interface {
+	ReceiveFrame() (messageData []byte, messageContext *MessageContext, err error)
+}
+
+/*type SendFramer interface {
+	FrameSender
+	ChainedSender(lower FrameSender) SendFramer
+}
+
+type ReceiveFramer interface {
+	FrameReceiver
+	ChainedReceiver(lower FrameReceiver)
+        }*/
+
+type Framer interface {
+	FrameSender
+	FrameReceiver
+}
+
+type NewlineFramer struct {
+	lower Framer
+	r     *bufio.Reader
+	ctx   *MessageContext
+}
+
+func NewNewlineFramer(lower Framer) *NewlineFramer {
+	return &NewlineFramer{lower, nil, nil}
+}
+
+func (nf *NewlineFramer) SendFrame(messageData []byte, messageContext *MessageContext) error {
+	r := bufio.NewReader(bytes.NewReader(messageData))
+	for {
+		bs, err := r.ReadBytes('\n')
+		if err == nil || err == io.EOF {
+			err2 := nf.lower.SendFrame(bs, messageContext)
+			if err2 != nil {
+				return err2
+			}
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (nf *NewlineFramer) ReceiveFrame() ([]byte, *MessageContext, error) {
+	var (
+		bs  []byte
+		err error
+	)
+	if nf.r == nil {
+		bs, nf.ctx, err = nf.lower.ReceiveFrame()
+		nf.r = bufio.NewReader(bytes.NewReader(bs))
+	}
+	messageData, err2 := nf.r.ReadBytes('\n')
+	if err2 != nil {
+		nf.r = nil
+		return messageData, nf.ctx, err2
+	}
+	return messageData, nf.ctx, err
+
+}
+
+/*
+   //
+type HTTPServerFramer struct {
 	KeyValue map[string]string
 }
 
-func (h *HTTPMessageFramer) Encode(kv map[string]interface{}, dst io.Writer, src io.Reader) (written int64, err error) {
+func (h *HTTPServerFramer) Encode(kv map[string]interface{}, dst io.Writer, src io.Reader) (written int64, err error) {
 	status, ok := kv["Statuscode"]
 	if ok {
 		// it's a response
@@ -54,15 +134,13 @@ func (h *HTTPMessageFramer) Encode(kv map[string]interface{}, dst io.Writer, src
 		n2, err2 := io.Copy(dst, src)
 		written += n2
 		err = err2
-	} else if _, ok := kv["Request"]; ok {
-		// This is a request
-		err = fmt.Errorf("Request not yet implemented")
 	} else {
-		err = fmt.Errorf("Neither Request nor Response key found")
+		err = fmt.Errorf("Statuscode for response not supplied")
 	}
 	return
 }
 
-func (h *HTTPMessageFramer) Decode(kv map[string]interface{}, dst io.Writer, src io.Reader) (written int64, err error) {
+func (h *HTTPServerFramer) Decode(kv map[string]interface{}, dst io.Writer, src io.Reader) (written int64, err error) {
 	return
 }
+*/

@@ -8,6 +8,7 @@ type Preconnection struct {
 	RemoteEndpoints     []*RemoteEndpoint
 	TransportProperties *TransportProperties
 	SecurityParameters  *SecurityParameters
+	Framers             []*Framer
 }
 
 // NewPreconnection returns a struct representing a potential
