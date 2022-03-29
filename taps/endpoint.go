@@ -1,36 +1,34 @@
 package taps
 
-import "net"
-
 type Endpoint struct {
-	Address   net.Addr
-	Transport string
-	Network   string
-	Interface string
+	Address  string
+	Protocol Protocol
 }
 
 type LocalEndpoint struct{ Endpoint }
 
 type RemoteEndpoint struct{ Endpoint }
 
-func NewRemoteEndpoint() *RemoteEndpoint {
+/*func NewRemoteEndpoint() *RemoteEndpoint {
 	return &RemoteEndpoint{}
 }
 
 func NewLocalEndpoint() *LocalEndpoint {
 	return &LocalEndpoint{}
 }
-
+*/
 // Copy returns a new Endpoint struct with its values deeply copied from e
 func (e *Endpoint) Copy() *Endpoint {
 	return &Endpoint{
-		Address:   e.Address,
-		Transport: e.Transport,
-		Network:   e.Network,
-		Interface: e.Interface,
+		Address:  e.Address,
+		Protocol: e.Protocol,
+		//Transport: e.Transport,
+		//Network:   e.Network,
+		//Interface: e.Interface,
 	}
 }
 
+/*
 func (e *Endpoint) WithNetwork(network string) {
 	e.Network = network
 }
@@ -62,3 +60,4 @@ func (e *Endpoint) WithInterface(intf string) {
 func (e *Endpoint) WithProtocol(proto Protocol) {
 
 }
+*/

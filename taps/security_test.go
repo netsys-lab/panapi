@@ -1,5 +1,6 @@
 package taps
 
+/*
 import (
 	"crypto/tls"
 	"fmt"
@@ -31,3 +32,4 @@ func ExampleSecurityParameters_Set() {
 	// Output: TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
 
 }
+*/

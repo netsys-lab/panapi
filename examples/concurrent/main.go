@@ -14,12 +14,20 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
-	"github.com/netsys-lab/panapi"
-	"github.com/netsys-lab/panapi/network"
 	"log"
 	"time"
+
+	"github.com/lucas-clemente/quic-go"
+	"github.com/netsec-ethz/scion-apps/pkg/pan"
+	"github.com/netsys-lab/panapi/pkg/convenience"
+	iquic "github.com/netsys-lab/panapi/pkg/inet/quic"
+	"github.com/netsys-lab/panapi/pkg/inet/tcp"
+	squic "github.com/netsys-lab/panapi/pkg/scion/quic"
+	"github.com/netsys-lab/panapi/rpc"
+	"github.com/netsys-lab/panapi/taps"
 )
 
 func fcheck(err error) {
@@ -38,45 +46,86 @@ func check(err error) bool {
 
 func main() {
 	var (
-		n, remote, local, t, script string
-		//		port         uint
+		remote, local, t string
+		proto            taps.Protocol
+		server, client   bool
 	)
 
 	flag.StringVar(&remote, "remote", "", "[Client] Remote (i.e. the server's) Address (e.g. 17-ffaa:1:1,[127.0.0.1]:1337 or 192.0.2.1:1337, depending on chosen network type)")
 	flag.StringVar(&local, "local", "", "[Server] Local Address to listen on, (e.g. 17-ffaa:1:1,[127.0.0.1]:1337 or 0.0.0.0:1337, depending on chosen network type)")
-	flag.StringVar(&n, "net", network.NETWORK_IP, "network type")
-	flag.StringVar(&t, "transport", network.TRANSPORT_QUIC, "transport protocol")
-	flag.StringVar(&script, "script", "", "[Client] Lua script for path selection")
+	//flag.StringVar(&n, "net", network.NETWORK_IP, "network type")
+	flag.StringVar(&t, "transport", "tcp", "transport protocol (tcp|quic")
+	//flag.StringVar(&script, "script", "", "[Client] Lua script for path selection")
 	//flag.UintVar(&port, "port", 0, "[Server] local port to listen on")
 	flag.Parse()
 
 	log.SetFlags(log.Lshortfile)
 
-	if (len(local) > 0) == (len(remote) > 0) {
-		check(fmt.Errorf("Either specify -port for server or -remote for client"))
+	if len(local) > 0 {
+		server = true
+	}
+
+	if len(remote) > 0 {
+		client = true
+	}
+
+	if server == client {
+		fcheck(fmt.Errorf("Either specify -port for server or -remote for client"))
+	}
+
+	if t == "tcp" {
+		proto = &tcp.Protocol{}
+	} else if t == "quic" || t == "squic" {
+		tlsConf := convenience.GenerateTLSConfig()
+		tlsConf.NextProtos = []string{"concurrent-quic-test"}
+		tlsConf.InsecureSkipVerify = true
+		if t == "quic" {
+			proto = &iquic.Protocol{
+				TLSConfig: &tlsConf,
+			}
+		} else {
+			var (
+				selector pan.Selector
+				config   *quic.Config
+			)
+			if client {
+				c, err := convenience.NewRPCClient()
+				if err != nil {
+					log.Fatalln(err)
+				}
+				selector = rpc.NewSelectorClient(c)
+				config = &quic.Config{Tracer: rpc.NewTracerClient(c)}
+			}
+			proto = &squic.Protocol{
+				TLSConfig:  &tlsConf,
+				Selector:   selector,
+				QuicConfig: config,
+			}
+		}
+
+	} else {
+		fcheck(fmt.Errorf("Either specify -t tcp, -t quic or -t squic"))
 	}
 
 	if len(local) > 0 {
-		check(runServer(n, t, local))
+		check(runServer(local, proto))
 	} else {
-		check(runClient(n, t, remote, script))
+		check(runClient(remote, proto))
 	}
 }
 
-func worker(conn network.Connection) {
+func worker(conn taps.Connection) {
 	defer conn.Close()
 	ticker := time.Tick(time.Second)
 
-	for check(conn.GetError()) {
-		request, err := network.NewLineMessageString((<-ticker).String())
+	r := bufio.NewReader(conn)
+	for {
+		request := (<-ticker).String() + "\n"
+		_, err := conn.Write([]byte(request))
 		if !check(err) {
 			break
 		}
-		if !check(conn.Send(request)) {
-			break
-		}
-		response := network.NewLineMessage()
-		err = conn.Receive(response)
+		response, err := r.ReadString('\n')
 		if !check(err) {
 			break
 		}
@@ -85,21 +134,25 @@ func worker(conn network.Connection) {
 
 }
 
-func runServer(net, t, local string) error {
-	LocalSpecifier := panapi.NewLocalEndpoint()
-	LocalSpecifier.WithNetwork(net)
-	LocalSpecifier.WithAddress(local)
-	LocalSpecifier.WithTransport(t)
+func runServer(local string, proto taps.Protocol) error {
+	LocalSpecifier := taps.LocalEndpoint{}
+	LocalSpecifier.Address = local
+	LocalSpecifier.Protocol = proto
 
-	Preconnection, err := panapi.NewPreconnection(LocalSpecifier, nil)
+	Preconnection := taps.Preconnection{
+		LocalEndpoint: &LocalSpecifier,
+	}
+
+	Listener, err := Preconnection.Listen()
 	if err != nil {
 		return err
 	}
 
-	Listener := Preconnection.Listen()
-
 	for {
-		Connection := <-Listener.ConnectionReceived
+		Connection, err := Listener.Accept()
+		if err != nil {
+			log.Println(err)
+		}
 		go worker(Connection)
 	}
 
@@ -107,26 +160,20 @@ func runServer(net, t, local string) error {
 
 }
 
-func runClient(net, t, remote, script string) error {
-	RemoteSpecifier := panapi.NewRemoteEndpoint()
-	RemoteSpecifier.WithNetwork(net)
-	RemoteSpecifier.WithAddress(remote)
-	RemoteSpecifier.WithTransport(t)
+func runClient(remote string, proto taps.Protocol) error {
+	RemoteSpecifier := taps.RemoteEndpoint{}
+	RemoteSpecifier.Address = remote
+	RemoteSpecifier.Protocol = proto
 
-	TransportProperties := network.NewTransportProperties()
-	if script != "" {
-		TransportProperties.Set("lua-script", script)
-	}
-
-	Preconnection, err := panapi.NewPreconnection(RemoteSpecifier, TransportProperties)
-	if err != nil {
-		return err
+	Preconnection := taps.Preconnection{
+		RemoteEndpoint: &RemoteSpecifier,
 	}
 
 	Connection, err := Preconnection.Initiate()
 	if err != nil {
 		return err
 	}
+
 	worker(Connection)
 
 	return nil

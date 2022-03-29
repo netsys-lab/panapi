@@ -1,9 +1,13 @@
 package taps
 
-import "io"
+type Listener interface {
+	Accept() (Connection, error)
+	Close() error
+	//Addr() net.Addr
+}
 
 type Protocol interface {
-	Dial(Endpoint) (io.ReadWriteCloser, error)
-	Accept(Endpoint) (io.ReadWriteCloser, error)
-	//Rendezvous(Endpoint, Endpoint) (io.ReadWriteCloser, error)
+	Satisfy(*Preconnection) (*TransportProperties, error)
+	NewListener(*Preconnection) (Listener, error)
+	Initiate(*Preconnection) (Connection, error)
 }

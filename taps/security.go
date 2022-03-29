@@ -32,10 +32,10 @@ type SecurityParameters struct {
 	PSK crypto.PrivateKey
 }
 
-// NewSecurityParameters TODO
+/*// NewSecurityParameters TODO
 func NewSecurityParameters() *SecurityParameters {
 	return &SecurityParameters{}
-}
+        }*/
 
 // NewDisabledSecurityParameters is intended for compatibility with
 // endpoints that do not support transport security protocols (such as
@@ -44,7 +44,7 @@ func NewDisabledSecurityParameters() *SecurityParameters {
 	return &SecurityParameters{}
 }
 
-// NewOpportunisticSecurityParameters() is not yet implemented
+/*// NewOpportunisticSecurityParameters() is not yet implemented
 func NewOpportunisticSecurityParameters() *SecurityParameters {
 	return &SecurityParameters{}
 }
@@ -57,7 +57,7 @@ func (sp SecurityParameters) SetTrustVerificationCallback() {
 func (sp SecurityParameters) SetIdentityChallengeCallback() {
 }
 
-/*
+
 // Set stores value for parameter, which is stripped of case and
 // non-alphabetic characters before being matched against the (equally
 // stripped) exported Field names of sp. The type of value must be

@@ -4,14 +4,13 @@ package taps
 // state that describes the properties of a Connection that might
 // exist in the future.
 type Preconnection struct {
-	LocalEndpoints      []*LocalEndpoint
-	RemoteEndpoints     []*RemoteEndpoint
-	TransportProperties *TransportProperties
-	SecurityParameters  *SecurityParameters
-	Framers             []*Framer
+	LocalEndpoint        *LocalEndpoint
+	RemoteEndpoint       *RemoteEndpoint
+	TransportPreferences TransportPreferences
+	SecurityParameters   SecurityParameters
 }
 
-// NewPreconnection returns a struct representing a potential
+/*// NewPreconnection returns a struct representing a potential
 // Connection.
 //
 // At least one Local Endpoint MUST be specified if the Preconnection
@@ -47,38 +46,28 @@ func NewPreconnection(
 		SecurityParameters:  SecurityParameters,
 	}
 }
+*/
 
 // Copy returns a new Preconnection struct with its values deeply
 // copied from p
 func (p *Preconnection) Copy() *Preconnection {
-	locals := make([]*LocalEndpoint, len(p.LocalEndpoints))
-	for i := 0; i < len(p.LocalEndpoints); i += 1 {
-		locals[i] = &LocalEndpoint{*p.LocalEndpoints[i].Copy()}
+	var (
+		local  *LocalEndpoint
+		remote *RemoteEndpoint
+	)
+	if p.LocalEndpoint != nil {
+		local = &LocalEndpoint{*p.LocalEndpoint.Copy()}
 	}
-	remotes := make([]*RemoteEndpoint, len(p.RemoteEndpoints))
-	for i := 0; i < len(p.RemoteEndpoints); i += 1 {
-		remotes[i] = &RemoteEndpoint{*p.RemoteEndpoints[i].Copy()}
+	if p.RemoteEndpoint != nil {
+		remote = &RemoteEndpoint{*p.RemoteEndpoint.Copy()}
 	}
 
 	return &Preconnection{
-		LocalEndpoints:      locals,
-		RemoteEndpoints:     remotes,
-		TransportProperties: p.TransportProperties.Copy(),
-		SecurityParameters:  p.SecurityParameters.Copy(),
+		LocalEndpoint:        local,
+		RemoteEndpoint:       remote,
+		TransportPreferences: *p.TransportPreferences.Copy(),
+		SecurityParameters:   *p.SecurityParameters.Copy(),
 	}
-}
-
-// Resolve called on a Preconnection p can be used by the application
-// to force early binding when required, for example with some Network
-// Address Translator (NAT) traversal protocols.
-//
-// See
-// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.1
-// and
-// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-7.3
-func (p *Preconnection) Resolve() (les []*LocalEndpoint, res []*RemoteEndpoint, err error) {
-	err = NotYetImplementendError
-	return
 }
 
 // Listen returns a Listener object. Once Listen() has been called,
@@ -87,11 +76,17 @@ func (p *Preconnection) Resolve() (les []*LocalEndpoint, res []*RemoteEndpoint, 
 // create another Listener.
 //
 // See https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-7.2
-func (p *Preconnection) Listen() (*Listener, error) {
-	return newListener(*p.Copy())
+func (p *Preconnection) Listen() (Listener, error) {
+	if p.LocalEndpoint == nil {
+		return nil, NewEstablishmentError("can't create listener without a local endpoint")
+	}
+	if p.LocalEndpoint.Protocol == nil {
+		return nil, NewEstablishmentError("no protocol specified")
+	}
+	return p.LocalEndpoint.Protocol.NewListener(p.Copy())
 }
 
-// Rendezvous listens on the Local Endpoint candidates for an incoming
+/*// Rendezvous listens on the Local Endpoint candidates for an incoming
 // Connection from the Remote Endpoint candidates, while also
 // simultaneously trying to establish a Connection from the Local
 // Endpoint candidates to the Remote Endpoint candidates.
@@ -99,9 +94,9 @@ func (p *Preconnection) Listen() (*Listener, error) {
 func (p *Preconnection) Rendezvous() (Connection, error) {
 	// TODO
 	return Connection{}, NotYetImplementendError
-}
+        }*/
 
-// AddRemote can add RemoteEndpoints obtained via p.Resolve() to the
+/*// AddRemote can add RemoteEndpoints obtained via p.Resolve() to the
 // Preconnection p.
 //
 // Deprecated: The spec is unclear why p.Resolve() should not modify p
@@ -110,8 +105,14 @@ func (p *Preconnection) Rendezvous() (Connection, error) {
 // overwritten or merely appended to? Feedback welcome.
 func (p *Preconnection) AddRemote([]*RemoteEndpoint) {
 	// TODO
-}
+        }*/
 
 func (p *Preconnection) Initiate() (Connection, error) {
-	return Connection{}, NotYetImplementendError
+	if p.RemoteEndpoint == nil {
+		return nil, NewEstablishmentError("can't initiate without a remote endpoint")
+	}
+	if p.RemoteEndpoint.Protocol == nil {
+		return nil, NewEstablishmentError("no protocol specified")
+	}
+	return p.RemoteEndpoint.Protocol.Initiate(p)
 }
