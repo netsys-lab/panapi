@@ -34,7 +34,7 @@ func handleCon(size int64, con network.Connection) {
 
 	if err := con.Receive(msg); err != nil {
 		log.Printf("error receiving msg from %s: %s\n", con.RemoteAddr(), err)
-	} else {
-		log.Printf("successfully received msg (hashsum: %x) from %s\n", md5.Sum([]byte(msg.String())), con.RemoteAddr())
+		return
 	}
+	log.Printf("successfully received msg (hashsum: %x) from %s\n", md5.Sum(msg.Bytes()), con.RemoteAddr())
 }

@@ -36,6 +36,10 @@ func (m *FixedMessage) String() string {
 	return string(m.b)
 }
 
+func (m *FixedMessage) Bytes() []byte {
+	return m.b
+}
+
 //TODO, add proper locking and reusability of buffer
 func (m *FixedMessage) Read(p []byte) (i int, err error) {
 	for i = 0; i < len(p) && i < len(m.b)-m.readindex; i++ {

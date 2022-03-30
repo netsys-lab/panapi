@@ -90,7 +90,7 @@ end
 
 function panapi.Close(laddr, raddr)
    panapi.Log("Close", laddr, raddr)
-   paths[raddr] = nil
+   -- paths[raddr] = nil
 end
 
 function panapi.Periodic(seconds)
@@ -101,6 +101,9 @@ end
 
 function stats.TracerForConnection(id, p, odcid)
    panapi.Log("id:", id, "perspective", p, "odcid", odcid)
+end
+function stats.Close(laddr, raddr)
+
 end
 function stats.StartedConnection(laddr, raddr, srcid, dstid)
 

@@ -41,7 +41,7 @@ type ConnectionStats struct {
 	BytesReceived   logging.ByteCount
 	Opened          *time.Time
 	Closed          *time.Time
-	ActivePath      *pan.Path
+	LastPath        *pan.Path
 	Local           *pan.UDPAddr
 	Remote          *pan.UDPAddr
 }
@@ -133,7 +133,9 @@ func (c *Client) OnPathEvaluated(local, remote *pan.UDPAddr, newPath *pan.Path) 
 	// log.Println("OracleClient - OnPathEvaluated")
 	// TODO: report to oracle on path change ?
 	s := c.stats[local.String()][remote.String()]
-	s.ActivePath = newPath
+	if newPath != nil {
+		s.LastPath = newPath
+	}
 }
 
 func (c *Client) Subscribe(dst pan.IA, service scoringServiceName) (*scoreResponse, error) {
@@ -154,13 +156,13 @@ func (c *Client) postReport(report *oracleReport) error {
 	log.Printf("posting to oracle, endpoint: %s", reqUrl)
 	body, err := json.Marshal(report.Stats)
 	if err != nil {
-		log.Printf("error posting to path oracle stats: %s", err)
+		log.Printf("error posting stats to path oracle %s \n", err)
 		return err
 	}
 
 	_, err = c.Post(shttp.MangleSCIONAddrURL(reqUrl), jsonContentType, bytes.NewReader(body))
 	if err != nil {
-		log.Printf("error posting to path oracle %stats", err)
+		log.Printf("error posting stats to path oracle %s \n", err)
 		return err
 	}
 	log.Println("successfully reported to path oracle")
@@ -172,7 +174,7 @@ func (c *Client) createReport(local, remote *pan.UDPAddr) *oracleReport {
 	report := oracleReport{
 		Src:   s.Local.IA,
 		Dst:   s.Remote.IA,
-		Path:  *s.ActivePath,
+		Path:  *s.LastPath,
 		Stats: stats{},
 	}
 

@@ -83,6 +83,9 @@ end
 function stats.TracerForConnection(id, p, odcid)
    panapi.Log("id:", id, "perspective", p, "odcid", odcid)
 end
+function stats.Close(laddr, raddr)
+
+end
 function stats.StartedConnection(laddr, raddr, srcid, dstid)
 
 end

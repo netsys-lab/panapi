@@ -5,8 +5,6 @@ import (
 	"github.com/docker/go-units"
 	"github.com/netsys-lab/panapi/network"
 	"log"
-	"net/http"
-	_ "net/http/pprof"
 )
 
 func main() {
@@ -33,20 +31,16 @@ func main() {
 		log.Fatalf("could not parse size %s", sizeHuman)
 	}
 
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
-
 	switch mode {
 	case "receiver":
 		err := runReceiver(net, transport, listenAddr, size)
 		if err != nil {
-			log.Fatalf("Error running server: %s", err)
+			log.Fatalf("Error running receiver: %s", err)
 		}
 	case "sender":
 		err := runSender(net, transport, remoteAddr, size)
 		if err != nil {
-			log.Fatalf("Error running client: %s", err)
+			log.Fatalf("Error running sender: %s", err)
 		}
 	default:
 		log.Fatalf("unknown mode, must be either 'receiver' or 'sender'")
