@@ -34,7 +34,7 @@ func (l *listener) Close() error {
 type Protocol struct {
 	QuicConfig *quic.Config
 	TLSConfig  *tls.Config
-	Selector   pan.Selector
+	Selector   taps.Selector
 }
 
 func (q *Protocol) Satisfy(p *taps.Preconnection) (*taps.TransportProperties, error) {
@@ -63,6 +63,9 @@ func (q *Protocol) NewListener(p *taps.Preconnection) (taps.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
+	if p.ConnectionPreferences != nil {
+		q.Selector.SetPreferences(p.ConnectionPreferences)
+	}
 	l, err := pan.ListenQUIC(
 		context.Background(),
 		netaddr.IPPortFrom(addr.IP, addr.Port),
@@ -78,6 +81,7 @@ func (q *Protocol) Initiate(p *taps.Preconnection) (taps.Connection, error) {
 	if err != nil {
 		return nil, err
 	}
+	q.Selector.SetPreferences(p.ConnectionPreferences)
 	session, err := pan.DialQUIC(
 		context.Background(),
 		netaddr.IPPort{},

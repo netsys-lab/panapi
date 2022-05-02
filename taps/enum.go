@@ -1,13 +1,17 @@
 package taps
 
+//go:generate stringer -type=Preference,MultipathPreference,MultipathPolicy,Directionality,CapacityProfile,StreamScheduler,ConnectionState -output enum_string.go
+
 import (
 	"github.com/netsys-lab/panapi/internal/enum"
 )
 
+type Preference enum.Preference
+
 const (
 	// (Implementation detail: Indicate that recommended default
 	// value for Property should be used)
-	unset enum.Preference = iota
+	unset Preference = iota
 
 	// No preference
 	Ignore
@@ -29,21 +33,12 @@ const (
 	Prohibit
 )
 
-/*func (p enum.Preference) String() string {
-	return [...]string{
-		"(unset)",
-		"Ignore",
-		"Require",
-		"Prefer",
-		"Avoid",
-		"Prohibit",
-	}[p-unset]
-        }*/
+type MultipathPreference enum.MultipathPreference
 
 const (
 	// (Implementation detail: need to use different defaults
 	// depending on endpoint)
-	dynamic enum.MultipathPreference = iota
+	dynamic MultipathPreference = iota
 
 	// The connection will not use multiple paths once
 	// established, even if the chosen transport supports using
@@ -59,20 +54,13 @@ const (
 	Passive
 )
 
-/*func (p MultipathPreference) String() string {
-	return [...]string{
-		"(unset)",
-		"Disabled",
-		"Active",
-		"Passive",
-	}[p-dynamic]
-        }*/
+type MultipathPolicy enum.MultipathPolicy
 
 const (
 	// The connection ought only to attempt to migrate between
 	// different paths when the original path is lost or becomes
 	// unusable.
-	Handover enum.MultipathPolicy = iota
+	Handover MultipathPolicy = iota
 
 	// The connection ought only to attempt to minimize the
 	// latency for interactive traffic patterns by transmitting
@@ -91,9 +79,11 @@ const (
 	Aggregate
 )
 
+type Directionality enum.Directionality
+
 const (
 	// The connection must support sending and receiving data
-	Bidirectional enum.Directionality = iota
+	Bidirectional Directionality = iota
 
 	// The connection must support sending data, and the application cannot use the connection to receive any data
 	UnidirectionalSend
@@ -102,18 +92,12 @@ const (
 	UnidirectionalReceive
 )
 
-/*func (d Directionality) String() string {
-	return [...]string{
-		"Bidirectional",
-		"Unidirectional Send",
-		"Unidirectional Receive",
-	}[d-Bidirectional]
-        }*/
+type CapacityProfile enum.CapacityProfile
 
 const (
 	// The application provides no information about its expected
 	// capacity profile.
-	Default enum.CapacityProfile = iota
+	Default CapacityProfile = iota
 
 	// The application is not interactive. It expects to send
 	// and/or receive data without any urgency. This can, for
@@ -152,28 +136,21 @@ const (
 	CapacitySeeking
 )
 
-/*func (p CapacityProfile) String() string {
-	return [...]string{
-		"Default",
-		"Scavenger",
-		"Low Latency/Interactive",
-		"Low Latency/Non-Interactive",
-		"Constant-Rate Streaming",
-		"Capacity-Seeking",
-	}[p-Default]
-        }*/
+type StreamScheduler enum.StreamScheduler
 
 const (
-	SCTP_SS_FCFS   enum.StreamScheduler = iota // First-Come, First-Served Scheduler
-	SCTP_SS_RR                                 // Round-Robin Scheduler
-	SCTP_SS_RR_PKT                             // Round-Robin Scheduler per Packet
-	SCTP_SS_PRIO                               // Priority-Based Scheduler
-	SCTP_SS_FC                                 // Fair Capacity Scheduler
-	SCTP_SS_WFQ                                // Weighted Fair Queueing Scheduler
+	SCTP_SS_FCFS   StreamScheduler = iota // First-Come, First-Served Scheduler
+	SCTP_SS_RR                            // Round-Robin Scheduler
+	SCTP_SS_RR_PKT                        // Round-Robin Scheduler per Packet
+	SCTP_SS_PRIO                          // Priority-Based Scheduler
+	SCTP_SS_FC                            // Fair Capacity Scheduler
+	SCTP_SS_WFQ                           // Weighted Fair Queueing Scheduler
 )
 
+type ConnectionState enum.ConnectionState
+
 const (
-	Establishing enum.ConnectionState = iota
+	Establishing ConnectionState = iota
 	Established
 	Closing
 	Closed

@@ -1,15 +1,11 @@
 package taps
 
-import (
-	"github.com/netsys-lab/panapi/internal/enum"
-)
-
 type TransportProperties struct {
 	Reliability       bool
 	PreserveOrder     bool
 	CongestionControl bool
 	Interface         string
-	Multipath         enum.MultipathPreference
+	Multipath         MultipathPreference
 }
 
 // Copy returns a new TransportProperties struct with its values deeply copied from tp

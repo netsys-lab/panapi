@@ -36,10 +36,14 @@ function rankpaths(raddr)
 end
 
 -- gets called when a set of paths to addr is known
-function panapi.Initialize(laddr, raddr, ps)
-   panapi.Log("Initialize", laddr, raddr)
+function panapi.Initialize(prefs, laddr, raddr, ps)
+   panapi.Log("Initialize", tprint(prefs), laddr, raddr)
    paths[raddr] = ps
    rankpaths(raddr)
+end
+
+function panapi.SetPreferences(prefs, laddr, raddr)
+   panapi.Log("SetPreferences", tprint(prefs))
 end
 
 -- gets called for every packet

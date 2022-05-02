@@ -1,21 +1,17 @@
 package taps
 
-import (
-	"github.com/netsys-lab/panapi/internal/enum"
-)
-
 type TransportPreferences struct {
-	Reliability       enum.Preference
-	PreserveOrder     enum.Preference
-	CongestionControl enum.Preference
-	Interface         map[string]enum.Preference
-	Multipath         enum.MultipathPreference
+	Reliability       Preference
+	PreserveOrder     Preference
+	CongestionControl Preference
+	Interface         map[string]Preference
+	Multipath         MultipathPreference
 }
 
 // Copy returns a new TransportProperties struct with its values deeply copied from tp
 func (tp *TransportPreferences) Copy() *TransportPreferences {
 	var (
-		newInterface = make(map[string]enum.Preference)
+		newInterface = make(map[string]Preference)
 	)
 	for key, value := range tp.Interface {
 		newInterface[key] = value
@@ -37,7 +33,7 @@ func NewTransportPreferences() *TransportPreferences {
 		Reliability:       Require,
 		PreserveOrder:     Require,
 		CongestionControl: Require,
-		Interface:         map[string]enum.Preference{},
+		Interface:         map[string]Preference{},
 		Multipath:         dynamic,
 	}
 }

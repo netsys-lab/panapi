@@ -4,10 +4,11 @@ package taps
 // state that describes the properties of a Connection that might
 // exist in the future.
 type Preconnection struct {
-	LocalEndpoint        *LocalEndpoint
-	RemoteEndpoint       *RemoteEndpoint
-	TransportPreferences TransportPreferences
-	SecurityParameters   SecurityParameters
+	LocalEndpoint         *LocalEndpoint
+	RemoteEndpoint        *RemoteEndpoint
+	TransportPreferences  TransportPreferences
+	SecurityParameters    SecurityParameters
+	ConnectionPreferences *ConnectionPreferences
 }
 
 /*// NewPreconnection returns a struct representing a potential
@@ -54,6 +55,7 @@ func (p *Preconnection) Copy() *Preconnection {
 	var (
 		local  *LocalEndpoint
 		remote *RemoteEndpoint
+		cp     *ConnectionPreferences
 	)
 	if p.LocalEndpoint != nil {
 		local = &LocalEndpoint{*p.LocalEndpoint.Copy()}
@@ -61,12 +63,16 @@ func (p *Preconnection) Copy() *Preconnection {
 	if p.RemoteEndpoint != nil {
 		remote = &RemoteEndpoint{*p.RemoteEndpoint.Copy()}
 	}
+	if p.ConnectionPreferences != nil {
+		cp = p.ConnectionPreferences.Copy()
+	}
 
 	return &Preconnection{
-		LocalEndpoint:        local,
-		RemoteEndpoint:       remote,
-		TransportPreferences: *p.TransportPreferences.Copy(),
-		SecurityParameters:   *p.SecurityParameters.Copy(),
+		LocalEndpoint:         local,
+		RemoteEndpoint:        remote,
+		TransportPreferences:  *p.TransportPreferences.Copy(),
+		SecurityParameters:    *p.SecurityParameters.Copy(),
+		ConnectionPreferences: cp,
 	}
 }
 
@@ -114,5 +120,5 @@ func (p *Preconnection) Initiate() (Connection, error) {
 	if p.RemoteEndpoint.Protocol == nil {
 		return nil, NewEstablishmentError("no protocol specified")
 	}
-	return p.RemoteEndpoint.Protocol.Initiate(p)
+	return p.RemoteEndpoint.Protocol.Initiate(p.Copy())
 }

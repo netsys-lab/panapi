@@ -1,9 +1,5 @@
 package taps
 
-import (
-	"github.com/netsys-lab/panapi/internal/enum"
-)
-
 type SelectionProperties struct {
 	// Reliability pecifies whether the application needs to use a
 	// transport protocol that ensures that all data is received
@@ -11,26 +7,26 @@ type SelectionProperties struct {
 	// data transfer is enabled, this also entails being notified
 	// when a Connection is closed or aborted. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.1)
-	Reliability enum.Preference
+	Reliability Preference
 
 	// PreserveMsgBoundaries specifies whether the application
 	// needs or prefers to use a transport protocol that preserves
 	// message boundaries. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.2)
-	PreserveMsgBoundaries enum.Preference
+	PreserveMsgBoundaries Preference
 
 	// PerMsgReliability specifies whether an application
 	// considers it useful to specify different reliability
 	// requirements for individual Messages in a Connection. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.3)
-	PerMsgReliability enum.Preference
+	PerMsgReliability Preference
 
 	// PreserveOrder specifies whether the application wishes to
 	// use a transport protocol that can ensure that data is
 	// received by the application on the other end in the same
 	// order as it was sent. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.4)
-	PreserveOrder enum.Preference
+	PreserveOrder Preference
 
 	// ZeroRTTMsg specifies whether an application would like to
 	// supply a Message to the transport protocol before
@@ -40,21 +36,21 @@ type SelectionProperties struct {
 	// multiple times (i.e., multiple copies of the message data
 	// may be passed to the Remote Endpoint). (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.5)
-	ZeroRTTMsg enum.Preference
+	ZeroRTTMsg Preference
 
 	// Multistreaming specifies that the application would prefer
 	// multiple Connections within a Connection Group to be
 	// provided by streams of a single underlying transport
 	// connection where possible.  (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.6)
-	Multistreaming enum.Preference
+	Multistreaming Preference
 
 	// FullChecksumSend specifies the application's need for
 	// protection against corruption for all data transmitted on
 	// this Connection. Disabling this property could enable later
 	// control of the sender checksum coverage. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.7)
-	FullChecksumSend enum.Preference
+	FullChecksumSend Preference
 
 	// FullChecksumRecv specifies the application's need for
 	// protection against corruption for all data received on this
@@ -62,7 +58,7 @@ type SelectionProperties struct {
 	// control of the required minimum receiver checksum
 	// coverage. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.8)
-	FullChecksumRecv enum.Preference
+	FullChecksumRecv Preference
 
 	// CongestionControl specifies whether the application would like
 	// the Connection to be congestion controlled or not. Note
@@ -78,7 +74,7 @@ type SelectionProperties struct {
 	// control in the application can have negative performance
 	// implications. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.9)
-	CongestionControl enum.Preference
+	CongestionControl Preference
 
 	// KeepAlive specifies whether the application would like the
 	// Connection to send keep-alive packets or not. Note that if
@@ -88,7 +84,7 @@ type SelectionProperties struct {
 	// the system will use the default period for generation of
 	// the keep alive-packets. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.10)
-	KeepAlive enum.Preference
+	KeepAlive Preference
 
 	// Interface allows the application to select any specific
 	// network interfaces or categories of interfaces it wants to
@@ -102,7 +98,7 @@ type SelectionProperties struct {
 	// Properties, this property maps interface identifier strings
 	// to Preferences. In future, common interface types might
 	// exist as constants.
-	Interface map[string]enum.Preference
+	Interface map[string]Preference
 
 	// PvD allows the application to control path selection by
 	// selecting which specific Provisioning Domain (PvD) or
@@ -116,7 +112,7 @@ type SelectionProperties struct {
 	// Properties, this property maps PvD identifier strings to
 	// Preferences. In future, common PvD types and categories
 	// might exist as constants.
-	PvD map[string]enum.Preference
+	PvD map[string]Preference
 
 	// Multipath specifies whether and how applications want to
 	// take advantage of transferring data across multiple paths
@@ -128,7 +124,7 @@ type SelectionProperties struct {
 	// The policy for using multiple paths is specified using the
 	// separate MultipathPolicy ConnectionProperty. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.14)
-	Multipath enum.MultipathPreference
+	Multipath MultipathPreference
 
 	// UseTemporaryLocalAddress allows the application to express
 	// a preference for the use of temporary local addresses,
@@ -145,7 +141,7 @@ type SelectionProperties struct {
 	// interfere with resumption mechanisms that some protocols
 	// rely on to reduce initial latency. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.13)
-	UseTemporaryLocalAddress enum.Preference
+	UseTemporaryLocalAddress Preference
 
 	// AdvertisesAltAddr specifies whether alternative addresses,
 	// e.g., of other interfaces, should be advertised to the peer
@@ -164,7 +160,7 @@ type SelectionProperties struct {
 	// that supports bidirectional communication to be
 	// selected. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.16)
-	Direction enum.Directionality
+	Direction Directionality
 
 	// SoftErrorNotify specifies whether an application considers
 	// it useful to be informed when an ICMP error message arrives
@@ -175,7 +171,7 @@ type SelectionProperties struct {
 	// be delivered, so applications cannot rely upon receiving
 	// them [RFC8085]. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.17)
-	SoftErrorNotify enum.Preference
+	SoftErrorNotify Preference
 
 	// ActiveReadBeforeSend specifies whether an application wants
 	// to diverge from the most common communication pattern - the
@@ -193,7 +189,7 @@ type SelectionProperties struct {
 	// streams, where the first transmitted data takes the role of
 	// an active open signal. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-6.2.18)
-	ActiveReadBeforeSend enum.Preference
+	ActiveReadBeforeSend Preference
 }
 
 // NewSelectionProperties creates SelectionProperties with the
@@ -211,8 +207,8 @@ func NewSelectionProperties() *SelectionProperties {
 		FullChecksumRecv:      Require,
 		CongestionControl:     Require,
 		KeepAlive:             Ignore,
-		Interface:             map[string]enum.Preference{},
-		PvD:                   map[string]enum.Preference{},
+		Interface:             map[string]Preference{},
+		PvD:                   map[string]Preference{},
 		// Needs to be resolved at runtime: Avoid for Listeners and Rendezvous Connections, else Prefer
 		UseTemporaryLocalAddress: unset,
 		// Needs to be resolved at runtime: Disabled for Initiated and Rendezvous Connections, else Passive
@@ -227,8 +223,8 @@ func NewSelectionProperties() *SelectionProperties {
 // Copy returns a new SelectionProperties struct with its values deeply copied from sp
 func (sp *SelectionProperties) Copy() *SelectionProperties {
 	var (
-		newInterface = make(map[string]enum.Preference)
-		newPvD       = make(map[string]enum.Preference)
+		newInterface = make(map[string]Preference)
+		newPvD       = make(map[string]Preference)
 	)
 	for key, value := range sp.Interface {
 		newInterface[key] = value

@@ -2,8 +2,6 @@ package taps
 
 import (
 	"time"
-
-	"github.com/netsys-lab/panapi/internal/enum"
 )
 
 type ConnectionPreferences struct {
@@ -18,13 +16,13 @@ type ConnectionPreferences struct {
 	// variation, and efficient use of the available capacity
 	// based on the capacity profile specified. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.6)
-	ConnCapacityProfile enum.CapacityProfile
+	ConnCapacityProfile CapacityProfile
 
 	// MultipathPolicy specifies the local policy for transferring
 	// data across multiple paths between the same end hosts if
 	// Multipath is not set to Disabled in TransportPreference. (See
 	// https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html#section-8.1.7)
-	MultipathPolicy enum.MultipathPolicy
+	MultipathPolicy MultipathPolicy
 
 	IsolateSession bool
 }

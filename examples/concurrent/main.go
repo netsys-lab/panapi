@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/lucas-clemente/quic-go"
-	"github.com/netsec-ethz/scion-apps/pkg/pan"
 	"github.com/netsys-lab/panapi/pkg/convenience"
 	iquic "github.com/netsys-lab/panapi/pkg/inet/quic"
 	"github.com/netsys-lab/panapi/pkg/inet/tcp"
@@ -54,7 +53,7 @@ func main() {
 	flag.StringVar(&remote, "remote", "", "[Client] Remote (i.e. the server's) Address (e.g. 17-ffaa:1:1,[127.0.0.1]:1337 or 192.0.2.1:1337, depending on chosen network type)")
 	flag.StringVar(&local, "local", "", "[Server] Local Address to listen on, (e.g. 17-ffaa:1:1,[127.0.0.1]:1337 or 0.0.0.0:1337, depending on chosen network type)")
 	//flag.StringVar(&n, "net", network.NETWORK_IP, "network type")
-	flag.StringVar(&t, "transport", "tcp", "transport protocol (tcp|quic")
+	flag.StringVar(&t, "transport", "tcp", "transport protocol (tcp|quic|squic")
 	//flag.StringVar(&script, "script", "", "[Client] Lua script for path selection")
 	//flag.UintVar(&port, "port", 0, "[Server] local port to listen on")
 	flag.Parse()
@@ -85,8 +84,8 @@ func main() {
 			}
 		} else {
 			var (
-				selector pan.Selector
 				config   *quic.Config
+				selector taps.Selector
 			)
 			if client {
 				c, err := convenience.NewRPCClient()
@@ -167,6 +166,9 @@ func runClient(remote string, proto taps.Protocol) error {
 
 	Preconnection := taps.Preconnection{
 		RemoteEndpoint: &RemoteSpecifier,
+		ConnectionPreferences: &taps.ConnectionPreferences{
+			ConnCapacityProfile: taps.CapacitySeeking,
+		},
 	}
 
 	Connection, err := Preconnection.Initiate()
