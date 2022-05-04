@@ -8,7 +8,17 @@ import (
 )
 
 type listener struct {
+	p *taps.Preconnection
 	l net.Listener
+}
+
+type Connection struct {
+	net.Conn
+	p *taps.Preconnection
+}
+
+func (c *Connection) Preconnection() *taps.Preconnection {
+	return c.p
 }
 
 func (l *listener) Accept() (taps.Connection, error) {
@@ -16,7 +26,7 @@ func (l *listener) Accept() (taps.Connection, error) {
 		return nil, errors.New("not a listener")
 	}
 	conn, err := l.l.Accept()
-	return taps.Connection(conn), err
+	return &Connection{conn, l.p}, err
 }
 
 func (l *listener) Close() error {
@@ -24,6 +34,10 @@ func (l *listener) Close() error {
 }
 
 type Protocol struct{}
+
+func (_ *Protocol) Selector() taps.Selector {
+	return nil
+}
 
 func (t *Protocol) Satisfy(p *taps.Preconnection) (*taps.TransportProperties, error) {
 	sp := p.TransportPreferences
@@ -60,5 +74,5 @@ func (t *Protocol) Initiate(p *taps.Preconnection) (taps.Connection, error) {
 	}
 	addr := p.RemoteEndpoint.Address
 	conn, err := net.Dial("tcp", addr)
-	return taps.Connection(conn), err
+	return &Connection{conn, p}, err
 }

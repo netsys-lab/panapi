@@ -10,4 +10,5 @@ type Protocol interface {
 	Satisfy(*Preconnection) (*TransportProperties, error)
 	NewListener(*Preconnection) (Listener, error)
 	Initiate(*Preconnection) (Connection, error)
+	Selector() Selector
 }

@@ -10,10 +10,21 @@ import (
 )
 
 type listener struct {
+	p *taps.Preconnection
 	l quic.Listener
 }
 
+type Connection struct {
+	quic.Stream
+	p *taps.Preconnection
+}
+
+func (c *Connection) Preconnection() *taps.Preconnection {
+	return c.p
+}
+
 func (l *listener) Accept() (taps.Connection, error) {
+
 	if l.l == nil {
 		return nil, errors.New("not a listener")
 	}
@@ -22,7 +33,7 @@ func (l *listener) Accept() (taps.Connection, error) {
 		return nil, err
 	}
 	stream, err := session.AcceptStream(context.Background())
-	return taps.Connection(stream), err
+	return &Connection{stream, l.p}, err
 }
 
 func (l *listener) Close() error {
@@ -32,6 +43,10 @@ func (l *listener) Close() error {
 type Protocol struct {
 	QuicConfig *quic.Config
 	TLSConfig  *tls.Config
+}
+
+func (q *Protocol) Selector() taps.Selector {
+	return nil
 }
 
 func (q *Protocol) Satisfy(p *taps.Preconnection) (*taps.TransportProperties, error) {
@@ -80,6 +95,6 @@ func (q *Protocol) Initiate(p *taps.Preconnection) (taps.Connection, error) {
 	}
 
 	stream, err := session.OpenStream() //Sync(context.Background())
-	return taps.Connection(stream), err
+	return &Connection{stream, p}, err
 
 }

@@ -6,4 +6,5 @@ import (
 
 type Connection interface {
 	io.ReadWriteCloser
+	Preconnection() *Preconnection
 }

@@ -216,7 +216,7 @@ func NewSelector(state *State) rpc.ServerSelector {
 }
 
 func (s *LuaSelector) Initialize(prefs *taps.ConnectionPreferences, local, remote pan.UDPAddr, paths []*pan.Path) error {
-	s.Printf("Initialize(%s,%s,[%d]pan.Path)", local, remote, len(paths))
+	//s.Printf("Initialize(%s,%s,[%d]pan.Path)", local, remote, len(paths))
 	s.Lock()
 	defer s.Unlock()
 

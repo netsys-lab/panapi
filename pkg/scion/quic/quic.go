@@ -12,7 +12,17 @@ import (
 )
 
 type listener struct {
+	p *taps.Preconnection
 	l quic.Listener
+}
+
+type Connection struct {
+	quic.Stream
+	p *taps.Preconnection
+}
+
+func (c *Connection) Preconnection() *taps.Preconnection {
+	return c.p
 }
 
 func (l *listener) Accept() (taps.Connection, error) {
@@ -24,17 +34,25 @@ func (l *listener) Accept() (taps.Connection, error) {
 		return nil, err
 	}
 	stream, err := session.AcceptStream(context.Background())
-	return taps.Connection(stream), err
+	return &Connection{stream, l.p}, err
 }
 
 func (l *listener) Close() error {
 	return l.l.Close()
 }
 
+type Config struct {
+	Quic     *quic.Config
+	TLS      *tls.Config
+	Selector taps.Selector
+}
+
 type Protocol struct {
-	QuicConfig *quic.Config
-	TLSConfig  *tls.Config
-	Selector   taps.Selector
+	Config Config
+}
+
+func (q *Protocol) Selector() taps.Selector {
+	return q.Config.Selector
 }
 
 func (q *Protocol) Satisfy(p *taps.Preconnection) (*taps.TransportProperties, error) {
@@ -64,7 +82,7 @@ func (q *Protocol) NewListener(p *taps.Preconnection) (taps.Listener, error) {
 		return nil, err
 	}
 	if p.ConnectionPreferences != nil {
-		err = q.Selector.SetPreferences(p.ConnectionPreferences)
+		err = q.Config.Selector.SetPreferences(p.ConnectionPreferences)
 		if err != nil {
 			return nil, err
 		}
@@ -73,8 +91,8 @@ func (q *Protocol) NewListener(p *taps.Preconnection) (taps.Listener, error) {
 		context.Background(),
 		netaddr.IPPortFrom(addr.IP, addr.Port),
 		nil,
-		q.TLSConfig,
-		q.QuicConfig,
+		q.Config.TLS,
+		q.Config.Quic,
 	)
 	return &listener{l: l}, err
 }
@@ -84,8 +102,8 @@ func (q *Protocol) Initiate(p *taps.Preconnection) (taps.Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	if q.Selector != nil {
-		err = q.Selector.SetPreferences(p.ConnectionPreferences)
+	if q.Config.Selector != nil {
+		err = q.Config.Selector.SetPreferences(p.ConnectionPreferences)
 		if err != nil {
 			return nil, err
 		}
@@ -95,16 +113,16 @@ func (q *Protocol) Initiate(p *taps.Preconnection) (taps.Connection, error) {
 		netaddr.IPPort{},
 		addr,
 		nil,
-		q.Selector,
+		q.Config.Selector,
 		"",
-		q.TLSConfig,
-		q.QuicConfig,
+		q.Config.TLS,
+		q.Config.Quic,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	stream, err := session.OpenStream() //Sync(context.Background())
-	return taps.Connection(stream), err
+	return &Connection{stream, p}, err
 
 }

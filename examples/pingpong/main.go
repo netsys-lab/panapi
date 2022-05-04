@@ -99,25 +99,66 @@ func main() {
 	}
 }
 
-func worker(conn taps.Connection) {
+func serverWorker(conn taps.Connection) {
 	defer conn.Close()
 	var (
-		ticker  = time.Tick(time.Second)
-		r       = bufio.NewReader(conn)
-		err     error
-		request = "Hello!\n"
+		r    = bufio.NewReader(conn)
+		err  error
+		ping string
 	)
 	for {
-		_, err = conn.Write([]byte(request))
+		ping, err = r.ReadString('\n')
 		if err != nil {
 			break
 		}
-		response, err := r.ReadString('\n')
+		_, err = conn.Write([]byte(ping))
 		if err != nil {
 			break
 		}
-		log.Printf("Message: %s", response)
-		request = (<-ticker).String() + "\n"
+	}
+	log.Println(err)
+}
+
+func clientWorker(pconn taps.Preconnection) {
+	conn, err := pconn.Initiate()
+	if err == nil {
+		defer conn.Close()
+		var (
+			ticker    = time.Tick(time.Second)
+			r         = bufio.NewReader(conn)
+			prefs     = pconn.ConnectionPreferences
+			now, then time.Time
+			response  string
+			i         uint
+		)
+		for {
+			i += 1
+			if i%10 == 0 {
+				prefs.ConnCapacityProfile = taps.LowLatencyNonInteractive
+				pconn.SetPreferences(prefs)
+			}
+			_, err = conn.Write([]byte(time.Now().Format(time.RFC3339Nano) + "\n"))
+			if err != nil {
+				break
+			}
+			response, err = r.ReadString('\n')
+			if err != nil {
+				break
+			}
+			now = time.Now()
+			then, err = time.Parse(time.RFC3339Nano+"\n", response)
+			if err != nil {
+				break
+			}
+			log.Printf(
+				"read %d bytes from %s (Profile: %s): %s",
+				len(response),
+				pconn.RemoteEndpoint.Address,
+				pconn.ConnectionPreferences.ConnCapacityProfile,
+				now.Sub(then),
+			)
+			<-ticker
+		}
 	}
 	log.Println(err)
 }
@@ -141,7 +182,8 @@ func runServer(local string, proto taps.Protocol) error {
 		if err != nil {
 			log.Println(err)
 		} else {
-			go worker(Connection)
+			log.Println("Got connection")
+			go serverWorker(Connection)
 		}
 	}
 }
@@ -158,12 +200,7 @@ func runClient(remote string, proto taps.Protocol) error {
 		},
 	}
 
-	Connection, err := Preconnection.Initiate()
-	if err != nil {
-		return err
-	}
-
-	worker(Connection)
+	clientWorker(Preconnection)
 
 	return nil
 

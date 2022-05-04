@@ -1,5 +1,7 @@
 package taps
 
+import "errors"
+
 // Preconnection is a passive data structure that merely maintains the
 // state that describes the properties of a Connection that might
 // exist in the future.
@@ -121,4 +123,26 @@ func (p *Preconnection) Initiate() (Connection, error) {
 		return nil, NewEstablishmentError("no protocol specified")
 	}
 	return p.RemoteEndpoint.Protocol.Initiate(p.Copy())
+}
+
+func (p *Preconnection) SetPreferences(cps *ConnectionPreferences) error {
+	var proto Protocol
+	if p.LocalEndpoint == nil {
+		if p.RemoteEndpoint == nil {
+			return errors.New("No endpoint specified")
+		} else {
+			proto = p.RemoteEndpoint.Protocol
+		}
+	} else {
+		proto = p.LocalEndpoint.Protocol
+	}
+	if proto == nil {
+		return errors.New("No protocol specified")
+	}
+	s := proto.Selector()
+	if s != nil {
+		return s.SetPreferences(cps)
+	} else {
+		return errors.New("Can not set preferences on empty selector")
+	}
 }
