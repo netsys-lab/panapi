@@ -2,11 +2,7 @@ package taps
 
 //go:generate stringer -type=Preference,MultipathPreference,MultipathPolicy,Directionality,CapacityProfile,StreamScheduler,ConnectionState -output enum_string.go
 
-import (
-	"github.com/netsys-lab/panapi/internal/enum"
-)
-
-type Preference enum.Preference
+type Preference uint8
 
 const (
 	// (Implementation detail: Indicate that recommended default
@@ -33,7 +29,7 @@ const (
 	Prohibit
 )
 
-type MultipathPreference enum.MultipathPreference
+type MultipathPreference uint8
 
 const (
 	// (Implementation detail: need to use different defaults
@@ -54,7 +50,7 @@ const (
 	Passive
 )
 
-type MultipathPolicy enum.MultipathPolicy
+type MultipathPolicy uint8
 
 const (
 	// The connection ought only to attempt to migrate between
@@ -79,7 +75,7 @@ const (
 	Aggregate
 )
 
-type Directionality enum.Directionality
+type Directionality uint8
 
 const (
 	// The connection must support sending and receiving data
@@ -92,7 +88,7 @@ const (
 	UnidirectionalReceive
 )
 
-type CapacityProfile enum.CapacityProfile
+type CapacityProfile uint8
 
 const (
 	// The application provides no information about its expected
@@ -136,7 +132,7 @@ const (
 	CapacitySeeking
 )
 
-type StreamScheduler enum.StreamScheduler
+type StreamScheduler uint8
 
 const (
 	SCTP_SS_FCFS   StreamScheduler = iota // First-Come, First-Served Scheduler
@@ -147,7 +143,7 @@ const (
 	SCTP_SS_WFQ                           // Weighted Fair Queueing Scheduler
 )
 
-type ConnectionState enum.ConnectionState
+type ConnectionState uint8
 
 const (
 	Establishing ConnectionState = iota

@@ -9,7 +9,10 @@ import (
 	"math/big"
 	"net"
 
+	"github.com/lucas-clemente/quic-go/logging"
+
 	"github.com/netsys-lab/panapi/rpc"
+	"github.com/netsys-lab/panapi/taps"
 )
 
 func GenerateTLSConfig() tls.Config {
@@ -30,10 +33,28 @@ func GenerateTLSConfig() tls.Config {
 	}
 }
 
+func DummyTLSConfig() tls.Config {
+	conf := GenerateTLSConfig()
+	conf.NextProtos = []string{"dummy-test"}
+	conf.InsecureSkipVerify = true
+	return conf
+}
+
 func NewRPCClient() (*rpc.Client, error) {
 	conn, err := net.Dial(rpc.DefaultDaemonAddress.Net, rpc.DefaultDaemonAddress.Name)
 	if err != nil {
 		return nil, err
 	}
 	return rpc.NewClient(conn)
+}
+
+func RPCClientHelper() (selector taps.Selector, tracer logging.Tracer, err error) {
+	var c *rpc.Client
+	c, err = NewRPCClient()
+	if err != nil {
+		return
+	}
+	selector = rpc.NewSelectorClient(c)
+	tracer = rpc.NewTracerClient(c)
+	return
 }

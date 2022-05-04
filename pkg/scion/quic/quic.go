@@ -64,7 +64,10 @@ func (q *Protocol) NewListener(p *taps.Preconnection) (taps.Listener, error) {
 		return nil, err
 	}
 	if p.ConnectionPreferences != nil {
-		q.Selector.SetPreferences(p.ConnectionPreferences)
+		err = q.Selector.SetPreferences(p.ConnectionPreferences)
+		if err != nil {
+			return nil, err
+		}
 	}
 	l, err := pan.ListenQUIC(
 		context.Background(),
@@ -81,7 +84,12 @@ func (q *Protocol) Initiate(p *taps.Preconnection) (taps.Connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	q.Selector.SetPreferences(p.ConnectionPreferences)
+	if q.Selector != nil {
+		err = q.Selector.SetPreferences(p.ConnectionPreferences)
+		if err != nil {
+			return nil, err
+		}
+	}
 	session, err := pan.DialQUIC(
 		context.Background(),
 		netaddr.IPPort{},
