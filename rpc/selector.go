@@ -19,6 +19,7 @@ import (
 	"net"
 
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
+	"github.com/netsys-lab/panapi/taps"
 )
 
 var (
@@ -30,7 +31,8 @@ var (
 )
 
 type ServerSelector interface {
-	Initialize(pan.UDPAddr, pan.UDPAddr, []*pan.Path) error
+	Initialize(*taps.ConnectionPreferences, pan.UDPAddr, pan.UDPAddr, []*pan.Path) error
+	SetPreferences(*taps.ConnectionPreferences, pan.UDPAddr, pan.UDPAddr) error
 	Path(pan.UDPAddr, pan.UDPAddr) (*pan.Path, error)
 	PathDown(pan.UDPAddr, pan.UDPAddr, pan.PathFingerprint, pan.PathInterface) error
 	Refresh(pan.UDPAddr, pan.UDPAddr, []*pan.Path) error
@@ -38,15 +40,15 @@ type ServerSelector interface {
 }
 
 type serverSelector struct {
-	fn        func(pan.UDPAddr, pan.UDPAddr) pan.Selector
-	selectors map[string]pan.Selector
+	fn        func(pan.UDPAddr, pan.UDPAddr) taps.Selector
+	selectors map[string]taps.Selector
 }
 
-func NewServerSelectorFunc(fn func(pan.UDPAddr, pan.UDPAddr) pan.Selector) ServerSelector {
-	return serverSelector{fn, map[string]pan.Selector{}}
+func NewServerSelectorFunc(fn func(pan.UDPAddr, pan.UDPAddr) taps.Selector) ServerSelector {
+	return serverSelector{fn, map[string]taps.Selector{}}
 }
 
-func (s *serverSelector) getSelector(local, remote pan.UDPAddr) pan.Selector {
+func (s *serverSelector) getSelector(local, remote pan.UDPAddr) taps.Selector {
 	addr := local.String() + remote.String()
 	selector, ok := s.selectors[addr]
 	if !ok {
@@ -56,13 +58,17 @@ func (s *serverSelector) getSelector(local, remote pan.UDPAddr) pan.Selector {
 	return selector
 }
 
-func (s serverSelector) Path(local, remote pan.UDPAddr) (*pan.Path, error) {
-	return s.getSelector(local, remote).Path(), nil
-}
-
-func (s serverSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) error {
+func (s serverSelector) Initialize(prefs *taps.ConnectionPreferences, local, remote pan.UDPAddr, paths []*pan.Path) error {
 	s.getSelector(local, remote).Initialize(local, remote, paths)
 	return nil
+}
+
+func (s serverSelector) SetPreferences(prefs *taps.ConnectionPreferences, local, remote pan.UDPAddr) error {
+	return s.getSelector(local, remote).SetPreferences(prefs)
+}
+
+func (s serverSelector) Path(local, remote pan.UDPAddr) (*pan.Path, error) {
+	return s.getSelector(local, remote).Path(), nil
 }
 
 func (s serverSelector) PathDown(local, remote pan.UDPAddr, fp pan.PathFingerprint, pi pan.PathInterface) error {
@@ -86,9 +92,11 @@ type SelectorMsg struct {
 	Remote        *pan.UDPAddr
 	Fingerprint   *pan.PathFingerprint
 	PathInterface *pan.PathInterface
+	Preferences   *taps.ConnectionPreferences
 	Paths         []*Path
 }
 
+// SelectorServer is the RPC-facing server part (the one with the rigit function signatures)
 type SelectorServer struct {
 	selector ServerSelector
 }
@@ -119,7 +127,15 @@ func (s *SelectorServer) Initialize(args, resp *SelectorMsg) error {
 	if args.Local == nil || args.Remote == nil {
 		return ErrDeref
 	}
-	return s.selector.Initialize(*args.Local, *args.Remote, paths)
+	return s.selector.Initialize(args.Preferences, *args.Local, *args.Remote, paths)
+}
+
+func (s *SelectorServer) SetPreferences(args, resp *SelectorMsg) error {
+	if args.Local == nil || args.Remote == nil {
+		return ErrDeref
+	}
+
+	return s.selector.SetPreferences(args.Preferences, *args.Local, *args.Remote)
 }
 
 func (s *SelectorServer) Path(args, resp *SelectorMsg) error {
@@ -163,16 +179,17 @@ func (s *SelectorServer) Close(args, resp *SelectorMsg) error {
 }
 
 type SelectorClient struct {
-	client *Client
-	paths  map[pan.PathFingerprint]*pan.Path
-	local  *pan.UDPAddr
-	remote *pan.UDPAddr
-	l      *log.Logger
+	connectionPreferences *taps.ConnectionPreferences
+	client                *Client
+	paths                 map[pan.PathFingerprint]*pan.Path
+	local                 *pan.UDPAddr
+	remote                *pan.UDPAddr
+	l                     *log.Logger
 }
 
-func NewSelectorClient(client *Client) *SelectorClient {
+func NewSelectorClient(client *Client) taps.Selector {
 	client.l.Printf("RPC connection etablished")
-	return &SelectorClient{client, map[pan.PathFingerprint]*pan.Path{}, nil, nil, client.l}
+	return &SelectorClient{nil, client, map[pan.PathFingerprint]*pan.Path{}, nil, nil, client.l}
 }
 
 func (s *SelectorClient) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) {
@@ -185,9 +202,10 @@ func (s *SelectorClient) Initialize(local, remote pan.UDPAddr, paths []*pan.Path
 		ps[i] = NewPathFrom(p)
 	}
 	err := s.client.Call("SelectorServer.Initialize", &SelectorMsg{
-		Local:  s.local,
-		Remote: s.remote,
-		Paths:  ps,
+		Local:       s.local,
+		Remote:      s.remote,
+		Paths:       ps,
+		Preferences: s.connectionPreferences,
 	}, &SelectorMsg{})
 	if err != nil {
 		s.l.Fatalln(err)
@@ -195,6 +213,22 @@ func (s *SelectorClient) Initialize(local, remote pan.UDPAddr, paths []*pan.Path
 	s.l.Printf("Initialize returned")
 }
 
+func (s *SelectorClient) SetPreferences(prefs *taps.ConnectionPreferences) error {
+	s.l.Println("SetPreferences called")
+	s.connectionPreferences = prefs
+	if s.local != nil && s.remote != nil {
+		return s.client.Call("SelectorServer.SetPreferences", &SelectorMsg{
+			Local:       s.local,
+			Remote:      s.remote,
+			Preferences: s.connectionPreferences,
+		}, &SelectorMsg{})
+	} else {
+		//we don't know the connection-identifying local and remote addresses yet
+		//so we wait until "Initialize" gets called naturally
+		s.l.Println("local and remote addresses not yet known, doing nothing for now")
+		return nil
+	}
+}
 func (s *SelectorClient) Path() *pan.Path {
 	//s.l.Println("Path called")
 	msg := SelectorMsg{}

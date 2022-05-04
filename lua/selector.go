@@ -20,6 +20,7 @@ import (
 
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 	"github.com/netsys-lab/panapi/rpc"
+	"github.com/netsys-lab/panapi/taps"
 	"github.com/yuin/gopher-lua"
 )
 
@@ -29,6 +30,17 @@ func newLuaPathInterface(intf pan.PathInterface) *lua.LTable {
 	iface.RawSetString("IfID", lua.LNumber(intf.IfID))
 	return &iface
 
+}
+
+func newLuaPreferences(prefs *taps.ConnectionPreferences) *lua.LTable {
+	t := lua.LTable{}
+	if prefs != nil {
+		t.RawSetString("ConnTimeout", lua.LString(prefs.ConnTimeout.String()))
+		t.RawSetString("ConnCapacityProfile", lua.LString(prefs.ConnCapacityProfile.String()))
+		t.RawSetString("MultipathPolicy", lua.LString(prefs.MultipathPolicy.String()))
+		t.RawSetString("IsolateSession", lua.LBool(prefs.IsolateSession))
+	}
+	return &t
 }
 
 func newLuaPath(path *pan.Path) *lua.LTable {
@@ -155,6 +167,7 @@ func NewSelector(state *State) rpc.ServerSelector {
 	mod := map[string]lua.LGFunction{}
 	for _, fn := range []string{
 		"Initialize",
+		"SetPreferences",
 		"Path",
 		"PathDown",
 		"Refresh",
@@ -202,7 +215,7 @@ func NewSelector(state *State) rpc.ServerSelector {
 	return s
 }
 
-func (s *LuaSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) error {
+func (s *LuaSelector) Initialize(prefs *taps.ConnectionPreferences, local, remote pan.UDPAddr, paths []*pan.Path) error {
 	s.Printf("Initialize(%s,%s,[%d]pan.Path)", local, remote, len(paths))
 	s.Lock()
 	defer s.Unlock()
@@ -212,7 +225,7 @@ func (s *LuaSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) e
 	s.state.clear_addr(remote)
 	lpaths := s.set_paths(remote, paths)
 
-	//call the "setpaths" function in the Lua script
+	//call the "Initialize" function in the Lua script
 	//with two arguments
 	//and don't expect a return value
 	return s.CallByParam(
@@ -221,18 +234,32 @@ func (s *LuaSelector) Initialize(local, remote pan.UDPAddr, paths []*pan.Path) e
 			Fn:      s.mod.RawGetString("Initialize"),
 			NRet:    0,
 		},
+		newLuaPreferences(prefs),
 		lua.LString(local.String()),
 		lua.LString(remote.String()),
 		lua_table_slice_to_table(lpaths),
 	)
 
 }
+func (s *LuaSelector) SetPreferences(prefs *taps.ConnectionPreferences, local, remote pan.UDPAddr) error {
+	s.Lock()
+	defer s.Unlock()
+
+	return s.CallByParam(lua.P{
+		Protect: true,
+		Fn:      s.mod.RawGetString("SetPreferences"),
+		NRet:    0},
+		newLuaPreferences(prefs),
+		lua.LString(local.String()),
+		lua.LString(remote.String()),
+	)
+}
 
 func (s *LuaSelector) Path(local, remote pan.UDPAddr) (*pan.Path, error) {
 	s.Lock()
 	defer s.Unlock()
 
-	//call the "selectpath" function from the Lua script
+	//call the "Path" function from the Lua script
 	//expect 1 return value
 	err := s.CallByParam(lua.P{
 		Protect: true,

@@ -30,6 +30,7 @@ import (
 	"github.com/netsec-ethz/scion-apps/pkg/pan"
 	"github.com/netsys-lab/panapi/lua"
 	"github.com/netsys-lab/panapi/rpc"
+	"github.com/netsys-lab/panapi/taps"
 )
 
 func main() {
@@ -53,6 +54,9 @@ func main() {
 	}
 	log.Println("Starting daemon")
 
+	// remove the underlying socket file on close
+	l.SetUnlinkOnClose(true)
+
 	if cpulog != "" {
 		f, err := os.Create(cpulog)
 		if err != nil {
@@ -70,8 +74,8 @@ func main() {
 	if err != nil {
 		log.Printf("Could not load path-selection script: %s", err)
 		log.Println("Falling back to default selector")
-		selector = rpc.NewServerSelectorFunc(func(pan.UDPAddr, pan.UDPAddr) pan.Selector {
-			return &pan.DefaultSelector{}
+		selector = rpc.NewServerSelectorFunc(func(pan.UDPAddr, pan.UDPAddr) taps.Selector {
+			return &taps.DefaultSelector{}
 		})
 	}
 

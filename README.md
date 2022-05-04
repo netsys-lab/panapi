@@ -28,9 +28,9 @@ PANAPI is an early [research](https://dl.acm.org/doi/10.1145/3472727.3472808) im
 
 - [x] TCP/IP support
 - [x] QUIC/IP support
-- [ ] UDP/IP support (_currently broken_)
+- [ ] UDP/IP support
 - [x] QUIC/SCION support
-- [ ] UDP/SCION support (_currently broken_)
+- [ ] UDP/SCION support
 
 ## Features
 
@@ -39,6 +39,7 @@ PANAPI is an early [research](https://dl.acm.org/doi/10.1145/3472727.3472808) im
 - [x] Scriptable path selector, implementing `pan.Selector`
   - [x] working Lua Data model
   - [x] working path ranking
+  - [x] live access to connection preferences like `CapacityProfile`
 - [x] Central path selection Daemon
 
 ### Path quality
@@ -55,7 +56,7 @@ PANAPI is an early [research](https://dl.acm.org/doi/10.1145/3472727.3472808) im
 - [ ] Move scripting selector to `/pkg` such that it could be used without the rest of PANAPI
 
 ## Ported Applications
-- [x] `spate` traffic generator
+- [ ] `spate` traffic generator
 - [x] `concurrent` code example client/server timestamp echoing
 - [ ] `http`
   - [ ] server
