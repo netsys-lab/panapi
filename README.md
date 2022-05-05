@@ -23,7 +23,6 @@ PANAPI is an early [research](https://dl.acm.org/doi/10.1145/3472727.3472808) im
   * [x] [cmd/daemon/pathselection.lua](cmd/daemon/pathselection.lua)
   * [x] [cmd/daemon/selector_with_stats.lua](cmd/daemon/selector_with_stats.lua)
 
-
 ## Protocol support
 
 - [x] TCP/IP support

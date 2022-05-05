@@ -132,11 +132,17 @@ func clientWorker(pconn taps.Preconnection) {
 			i         uint
 		)
 		for {
+			// Switch Profiles occasionally
 			i += 1
 			if i%10 == 0 {
-				prefs.ConnCapacityProfile = taps.LowLatencyNonInteractive
+				if i%20 == 0 {
+					prefs.ConnCapacityProfile = taps.Scavenger
+				} else {
+					prefs.ConnCapacityProfile = taps.LowLatencyNonInteractive
+				}
 				pconn.SetPreferences(prefs)
 			}
+
 			_, err = conn.Write([]byte(time.Now().Format(time.RFC3339Nano) + "\n"))
 			if err != nil {
 				break
