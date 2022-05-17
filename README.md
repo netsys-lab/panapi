@@ -7,7 +7,7 @@
 
 PANAPI is an early [research](https://dl.acm.org/doi/10.1145/3472727.3472808) implementation of a next-generation networking [API to the transport layer](https://www.ietf.org/archive/id/draft-ietf-taps-interface-13.html). The latter is currently under development in the IETF [TAPS working group](https://datatracker.ietf.org/wg/taps/about/). PANAPI is an [EU-funded](https://pointer.ngi.eu/) open-source project, that adds support for the [SCION network architecture](https://scion-architecture.net/) to a general purpose TAPS-like networking API.
 
-For more details, please check out our [PANAPI Paper](https://dl.acm.org/doi/pdf/10.1145/3472727.3472808) and our [Basic Path Selection presentation](blob/main/assets/presentation.pdf).
+For more details, please check out our [PANAPI Paper](https://dl.acm.org/doi/pdf/10.1145/3472727.3472808) and our [Basic Path Selection presentation](assets/presentation.pdf).
 
 ## `import "panapi"` - The PANAPI Library
 
