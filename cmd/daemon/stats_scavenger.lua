@@ -5,95 +5,104 @@ tick = 0
 
 function panapi.Periodic(seconds)
    --panapi.Log("Tick", seconds)
-   tick = tick + seconds
+   tick = tick + 1
 end
 
--- global "path database variable",
--- not directly referenced from go
-paths = {}
+raddr2fps = {}
 
+fp2path = {}
+
+fp2tick = {}
+
+fp2rtt = {}
+
+laddr2prefs = {}
+laddr2fp = {}
 
 -- global table to keep track of connections
 conns = {}
 
-fingerprints = {}
+--fingerprints = {}
 
 
 function nextScavengePath(raddr)
+   local fingerprints = {}
+   for _, fp in ipairs(raddr2fps[raddr]) do
+      table.insert(fingerprints, fp)
+   end
    table.sort(
-      fingerprints[raddr],
+      fingerprints,
       function(fp_a, fp_b)
-         return paths[raddr][fp_a].LatestTick < paths[raddr][fp_b].LatestTick
+         return fp2tick[fp_a] < fp2tick[fp_b]
       end
    )
-   return paths[raddr][fingerprints[raddr][1]].Path
+   panapi.Log("Chosen tick:", fp2tick[fingerprints[1]])
+   return fp2path[fingerprints[1]]
 end
 
 
 function nextBestPath(raddr)
-   table.sort(
-      fingerprints[raddr],
+   local fingerprints = {}
+   for _, fp in ipairs(raddr2fps[raddr]) do
+      table.insert(fingerprints, fp)
+   end
+    table.sort(
+      fingerprints,
       function(fp_a, fp_b)
-         return (paths[raddr][fp_a].RTTStats.LatestRTT or 0) < (paths[raddr][fp_b].RTTStats.LatestRTT or 0)
+         return (fp2rtt[fp_a] or 1000) < (fp2rtt[fp_b] or 0)
       end
-   )
-   return paths[raddr][fingerprints[raddr][1]].Path
+    )
+    panapi.Log("Chosen tick:", fp2tick[fingerprints[1]])
+   return fp2path[fingerprints[1]]
 end
-
-
 
 
 
 -- gets called when a set of paths to addr is known
 function panapi.Initialize(prefs, laddr, raddr, ps)
    panapi.Log("New connection [" .. laddr, "|", raddr .. "] Profile:", prefs.ConnCapacityProfile)
-   paths[raddr] = paths[raddr] or {}
-   fingerprints[raddr] = {}
+   raddr2fps[raddr] = raddr2fps[raddr] or {}
    for _, path in ipairs(ps) do
-      table.insert(fingerprints[raddr], path.Fingerprint)
-      paths[raddr][path.Fingerprint] = {
-         Path = path,
-         LatestTick = tick,
-         RTTStats = {},
-      }
+      local fp = path.Fingerprint
+      fp2path[fp] = path
+      fp2tick[fp] = tick
+      table.insert(raddr2fps[raddr], fp)
    end
-   conns[raddr] = conns[raddr] or {}
-   conns[raddr][laddr] = conns[raddr][laddr] or {}
-   if prefs ~= nil then
-      conns[raddr][laddr].Preferences = prefs
-   end
+   panapi.SetPreferences(prefs, laddr, raddr)
 end
 
 function panapi.SetPreferences(prefs, laddr, raddr)
    panapi.Log("Update Preferences [" .. laddr, "|", raddr .. "] Profile:", prefs.ConnCapacityProfile)
-   conns[raddr][laddr].Preferences = prefs
---   panapi.Log("(Will return " .. tprint(panapi.Path(laddr, raddr).Fingerprint) .. ")")
+
+   if prefs ~= nil then
+      laddr2prefs[laddr] = laddr2prefs[laddr] or {}
+      laddr2prefs[laddr] = prefs
+   end
 end
 
 -- gets called for every packet
 -- implementation needs to be efficient
 function panapi.Path(laddr, raddr)
-   --
-   if next(paths[raddr]) ~= nil then
-      local conn = conns[raddr][laddr]
-      if conn.Preferences["ConnCapacityProfile"] == "Scavenger" then
-         local p = nextScavengePath(raddr)
-         conn.LastPath = p
+   if #raddr2fps[raddr] > 0 then
+      local p = nil
+      if laddr2prefs[laddr]["ConnCapacityProfile"] == "Scavenger" then
+         p = nextScavengePath(raddr)
          panapi.Log("Scavenger Path", p.Fingerprint)
-         return p
       else
-         local p = nextBestPath(raddr)
-         conn.LastPath = p
+         p = nextBestPath(raddr)
          panapi.Log("Best Path", p.Fingerprint)
-         return p
       end
+      laddr2fp[laddr] = p.Fingerprint
+      return p
    end
 end
 
 -- gets called whenever a path disappears(?)
 function panapi.PathDown(laddr, raddr, fp, pi)
    panapi.Log("PathDown called with", laddr, raddr, fp, pi)
-   paths[raddr][fp] = nil
+   fp2path[fp] = nil
+   fp2rtt[fp] = nil
+   fp2tick[fp] = nil
 end
 
 function panapi.Refresh(laddr, raddr, ps)
@@ -104,21 +113,20 @@ end
 
 function panapi.Close(laddr, raddr)
    panapi.Log("Close", laddr, raddr)
-   conns[raddr][laddr] = nil
-   --paths[raddr] = nil
+   raddr2fps[raddr] = nil
+   laddr2fp[laddr] = nil
+   laddr2prefs[laddr] = nil
 end
 
 
 function stats.UpdatedMetrics(laddr, raddr, rttStats, cwnd, bytesInFlight, packetsInFlight)
    --panapi.Log("UpdatedMetrics", cwnd, bytesInFlight, packetsInFlight)
-   local lastpath = conns[raddr][laddr].LastPath
-   if lastpath == nil then return end
-   local path = paths[raddr][lastpath.Fingerprint]
-   path.LatestTick = tick
-   path.RTTStats = rttStats
+   local fp = laddr2fp[laddr]
+   if fp == nil then return end
+   fp2tick[fp] = tick
+   fp2rtt[fp] = rttStats.LatestRTT
 --   panapi.Log("\n", tprint(rttStats, 1))
 end
-
 
 -- HELPER FUNCTIONS ---
 -- 
