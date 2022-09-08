@@ -38,7 +38,6 @@ end
 function panapi.SetPreferences(prefs, laddr, raddr)
    panapi.Log("Update Preferences [" .. laddr, "|", raddr .. "] Profile:", prefs.ConnCapacityProfile)
    conns[raddr][laddr] = prefs
-   
 end
 
 -- gets called for every packet

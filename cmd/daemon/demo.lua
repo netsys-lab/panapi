@@ -120,7 +120,7 @@ function panapi.Periodic(seconds)
 end
 
 
---[[function stats.TracerForConnection(id, p, odcid)
+function stats.TracerForConnection(id, p, odcid)
    calls.cur.TracerForConnection = (calls.cur.TracerForConnection or 0) + 1
    --panapi.Log("id:", id, "perspective", p, "odcid", odcid)
 end
@@ -223,8 +223,7 @@ function stats.LossTimerCanceled(laddr, raddr)
 end
 function stats.Debug(laddr, raddr)
    calls.cur.Debug = (calls.cur.Debug or 0) + 1
-   end
-]]--
+end
 
 -- HELPER FUNCTIONS ---
 -- 

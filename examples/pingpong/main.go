@@ -30,9 +30,9 @@ import (
 
 func main() {
 	var (
-		remote, local, t, n string
-		proto               taps.Protocol
-		server, client      bool
+		remote, local, t, n, p string
+		proto                  taps.Protocol
+		server, client         bool
 	)
 
 	flag.StringVar(&remote, "remote", "", `[Client] Remote (i.e. the server's) Address
@@ -41,9 +41,10 @@ func main() {
         (e.g. 17-ffaa:1:1,[127.0.0.1]:1337 or 0.0.0.0:1337, depending on chosen network type)`)
 	flag.StringVar(&n, "net", "IP", "network type (IP|SCION)")
 	flag.StringVar(&t, "transport", "QUIC", "transport protocol (TCP|QUIC)")
+	flag.StringVar(&p, "profile", "", "profile to select ("+taps.Scavenger.String()+"|"+taps.LowLatencyInteractive.String()+")")
 	flag.Parse()
 
-	log.SetFlags(log.Lshortfile)
+	log.SetFlags(log.Ltime)
 
 	if len(local) > 0 {
 		server = true
@@ -95,7 +96,13 @@ func main() {
 	if len(local) > 0 {
 		log.Println(runServer(local, proto))
 	} else {
-		log.Println(runClient(remote, proto))
+		if p == taps.Scavenger.String() {
+			log.Println(runClient(remote, proto, taps.Scavenger))
+		} else if p == taps.LowLatencyInteractive.String() {
+			log.Println(runClient(remote, proto, taps.LowLatencyInteractive))
+		} else {
+			log.Println(runClient(remote, proto, taps.Default))
+		}
 	}
 }
 
@@ -130,11 +137,15 @@ func clientWorker(pconn taps.Preconnection) {
 			now, then time.Time
 			response  string
 			i         uint
+			sw        bool
 		)
-		for {
+		if prefs.ConnCapacityProfile == taps.Default {
 			// Switch Profiles occasionally
+			sw = true
+		}
+		for {
 			i += 1
-			if i%10 == 0 {
+			if i%10 == 0 && sw {
 				if i%20 == 0 {
 					prefs.ConnCapacityProfile = taps.Scavenger
 				} else {
@@ -194,7 +205,7 @@ func runServer(local string, proto taps.Protocol) error {
 	}
 }
 
-func runClient(remote string, proto taps.Protocol) error {
+func runClient(remote string, proto taps.Protocol, profile taps.CapacityProfile) error {
 	RemoteSpecifier := taps.RemoteEndpoint{}
 	RemoteSpecifier.Address = remote
 	RemoteSpecifier.Protocol = proto
@@ -202,7 +213,7 @@ func runClient(remote string, proto taps.Protocol) error {
 	Preconnection := taps.Preconnection{
 		RemoteEndpoint: &RemoteSpecifier,
 		ConnectionPreferences: &taps.ConnectionPreferences{
-			ConnCapacityProfile: taps.Scavenger,
+			ConnCapacityProfile: profile,
 		},
 	}
 
