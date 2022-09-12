@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -159,7 +159,7 @@ type LuaSelector struct {
 	d   time.Duration
 }
 
-//func NewLuaSelector(script string) (*LuaSelector, error) {
+// func NewLuaSelector(script string) (*LuaSelector, error) {
 func NewSelector(state *State) rpc.ServerSelector {
 	state.Lock()
 	defer state.Unlock()
@@ -188,6 +188,11 @@ func NewSelector(state *State) rpc.ServerSelector {
 		}
 		state.Println(s)
 		return 0
+	}
+
+	mod["Now"] = func(L *lua.LState) int {
+		L.Push(lua.LNumber(time.Now().UnixMicro()))
+		return 1
 	}
 
 	panapi := state.RegisterModule("panapi", mod).(*lua.LTable)
@@ -228,7 +233,8 @@ func (s *LuaSelector) Initialize(prefs *taps.ConnectionPreferences, local, remot
 	//call the "Initialize" function in the Lua script
 	//with two arguments
 	//and don't expect a return value
-	return s.CallByParam(
+
+	err := s.CallByParam(
 		lua.P{
 			Protect: true,
 			Fn:      s.mod.RawGetString("Initialize"),
@@ -239,6 +245,10 @@ func (s *LuaSelector) Initialize(prefs *taps.ConnectionPreferences, local, remot
 		lua.LString(remote.String()),
 		lua_table_slice_to_table(lpaths),
 	)
+	if err != nil {
+		log.Println(err)
+	}
+	return err
 
 }
 func (s *LuaSelector) SetPreferences(prefs *taps.ConnectionPreferences, local, remote pan.UDPAddr) error {

@@ -26,6 +26,7 @@ func (l *listener) Accept() (taps.Connection, error) {
 		return nil, errors.New("not a listener")
 	}
 	conn, err := l.l.Accept()
+	l.p.RemoteEndpoint = &taps.RemoteEndpoint{taps.Endpoint{Address: conn.RemoteAddr().String()}}
 	return &Connection{conn, l.p}, err
 }
 

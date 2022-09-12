@@ -10,17 +10,23 @@ import (
 )
 
 type listener struct {
-	p *taps.Preconnection
-	l quic.Listener
+	pre *taps.Preconnection
+	l   quic.Listener
 }
 
 type Connection struct {
 	quic.Stream
-	p *taps.Preconnection
+	pre *taps.Preconnection
+	quic.Session
 }
 
 func (c *Connection) Preconnection() *taps.Preconnection {
-	return c.p
+	return c.pre
+}
+
+func (c *Connection) Close() error {
+	c.Stream.Close()
+	return c.Session.CloseWithError(0, "closed")
 }
 
 func (l *listener) Accept() (taps.Connection, error) {
@@ -32,8 +38,11 @@ func (l *listener) Accept() (taps.Connection, error) {
 	if err != nil {
 		return nil, err
 	}
+	ep := taps.Endpoint{Address: session.RemoteAddr().String()}
+	l.pre.RemoteEndpoint = &taps.RemoteEndpoint{Endpoint: ep}
 	stream, err := session.AcceptStream(context.Background())
-	return &Connection{stream, l.p}, err
+
+	return &Connection{stream, l.pre, session}, err
 }
 
 func (l *listener) Close() error {
@@ -80,7 +89,7 @@ func (q *Protocol) NewListener(p *taps.Preconnection) (taps.Listener, error) {
 		q.TLSConfig,
 		q.QuicConfig,
 	)
-	return &listener{l: l}, err
+	return &listener{pre: p, l: l}, err
 }
 
 func (q *Protocol) Initiate(p *taps.Preconnection) (taps.Connection, error) {
@@ -95,6 +104,6 @@ func (q *Protocol) Initiate(p *taps.Preconnection) (taps.Connection, error) {
 	}
 
 	stream, err := session.OpenStream() //Sync(context.Background())
-	return &Connection{stream, p}, err
+	return &Connection{stream, p, session}, err
 
 }

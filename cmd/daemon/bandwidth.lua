@@ -1,8 +1,7 @@
-print("HELLO FROM LUA DE(A)MO(N) SCRIPT")
+print("HELLO FROM PROFILES SCRIPT")
 
--- global "path database variable",
--- not directly referenced from go
-paths = {}
+-- global variable to track "time"
+tick = 0
 
 -- global table to keep function call statistics
 calls = {
@@ -10,86 +9,227 @@ calls = {
    old = {},
 }
 
--- global table to keep track of connections
-conns = {}
+-- shutdown
+shutdown = 0
 
-function rankpaths(raddr)
-   table.sort(
-      paths[raddr],
-      function(path_a, path_b)
-         return path_a.Expiry < path_b.Expiry
+-- gets called every second or so
+function panapi.Periodic(seconds)
+   tick = tick + 1
+   if shutdown ~= 0 then
+      panapi.Log("shutting down in", shutdown - tick, "seconds")
+      if tick > shutdown then
+         panapi.Log("shutting down to inspect correct path expiry behavior")
+         panapi.Log(tprint(fp2bw))
+         os.exit(0)
       end
-   )
-   table.sort(
-      paths[raddr],
-      function(path_a, path_b)
-         return #path_a.Metadata.Interfaces < #path_b.Metadata.Interfaces
-      end
-   )
+   end
 end
+
+-- map remote address to path fingerprints
+raddr2fps = {}
+
+-- map path fingerprint to path
+fp2path = {}
+
+-- map path fingerprint to tick ("time") when path was last used
+fp2last = {}
+
+-- map path fingerprint to observed RTT
+fp2rtt = {}
+
+-- map path fingerprint to observed bandwidth
+fp2bw = {}
+
+-- map path fingerprint to used ticks
+fp2ticks = {}
+
+-- map path fingerprint to path ID (number)
+fp2id = {}
+
+-- map local address to preferences table
+laddr2prefs = {}
+
+-- map local address to path fingerprint
+laddr2fp = {}
+
+-- map local address to path switch microsecond
+laddr2switchtime = {}
+
+-- map local address to transferred bytes on the current path
+laddr2bytes_on_path = {}
+
+
+-- pick path with oldest tick (i.e., longest unused path)
+function nextScavengePath(raddr)
+   local fingerprints = {}
+   for _, fp in ipairs(raddr2fps[raddr]) do
+      table.insert(fingerprints, fp)
+   end
+   table.sort(
+      fingerprints,
+      function(fp_a, fp_b)
+         return fp2last[fp_a] < fp2last[fp_b]
+      end
+   )
+   --panapi.Log("Chosen tick:", fp2last[fingerprints[1]])
+   return fp2path[fingerprints[1]]
+end
+
+-- pick path with worst RTT
+function nextWorstRTTPath(raddr)
+   local fingerprints = {}
+   for _, fp in ipairs(raddr2fps[raddr]) do
+      table.insert(fingerprints, fp)
+   end
+    table.sort(
+      fingerprints,
+      function(fp_a, fp_b)
+         return (fp2rtt[fp_a] or 1000) > (fp2rtt[fp_b] or 1000)
+      end
+    )
+    --panapi.Log("Chosen tick:", fp2tick[fingerprints[1]])
+    return fp2path[fingerprints[1]]
+end
+
+function nextBestRTTPath(raddr)
+   local fingerprints = {}
+   for _, fp in ipairs(raddr2fps[raddr]) do
+      table.insert(fingerprints, fp)
+   end
+    table.sort(
+      fingerprints,
+      function(fp_a, fp_b)
+         return (fp2rtt[fp_a] or 1000) < (fp2rtt[fp_b] or 0)
+      end
+    )
+   return fp2path[fingerprints[1]]
+end
+
+function nextBestBWPath(laddr, raddr)
+   local fp = laddr2fp[laddr]
+   local fingerprints = {}
+   for _, fp in ipairs(raddr2fps[raddr]) do
+      table.insert(fingerprints, fp)
+   end
+   table.sort(
+      fingerprints,
+      function(fp_a, fp_b)
+         return (fp2bw[fp_a] or 1000) < (fp2bw[fp_b] or 0)
+      end
+    )
+   return fp2path[fingerprints[1]]
+end
+
 
 -- gets called when a set of paths to addr is known
 function panapi.Initialize(prefs, laddr, raddr, ps)
-   panapi.Log("New connection between", laddr, "and", raddr .. ", Profile:", prefs.ConnCapacityProfile)
-   calls.cur.Initialize = (calls.cur.Initialize or 0) + 1
-   paths[raddr] = ps
-   conns[raddr] = conns[raddr] or {}
-   conns[raddr][laddr] = prefs
-   rankpaths(raddr)
+   panapi.Log("New connection [" .. laddr, "|", raddr .. "]")
+   raddr2fps[raddr] = raddr2fps[raddr] or {}
+   laddr2switchtime[laddr] = panapi.Now()
+   for i, path in ipairs(ps) do
+      local fp = path.Fingerprint
+      fp2path[fp] = path
+      fp2last[fp] = tick
+      fp2id[fp] = i
+      table.insert(raddr2fps[raddr], fp)
+   end
+   panapi.SetPreferences(prefs, laddr, raddr)
 end
 
 function panapi.SetPreferences(prefs, laddr, raddr)
-   calls.cur.SetPreferences = (calls.cur.SetPreferences or 0) + 1
-   panapi.Log("SetPreferences, Profile:", prefs,ConnCapacityProfile)
-   conns[raddr][laddr] = prefs
-   
+   panapi.Log("Update Preferences [" .. laddr, "|", raddr .. "] Profile:", prefs.ConnCapacityProfile)
+   if prefs.ConnCapacityProfile == "CapacitySeeking" then
+
+   end
+   if prefs ~= nil then
+      laddr2prefs[laddr] = laddr2prefs[laddr] or {}
+      laddr2prefs[laddr] = prefs
+   end
 end
 
 -- gets called for every packet
 -- implementation needs to be efficient
 function panapi.Path(laddr, raddr)
-   calls.cur.Path = (calls.cur.Path or 0) + 1
-   --panapi.Log("Path", laddr, raddr)
-   if #paths[raddr] > 0 then
-      panapi.Log(tprint(conns))
-      if conns[raddr][laddr]["ConnCapacityProfile"] == "Scavenger" then
-         p = paths[raddr][#paths[raddr]]
-         return p
+   if #raddr2fps[raddr] > 0 then
+      local p = nil
+      local oldfp = laddr2fp[laddr]
+      local profile = laddr2prefs[laddr]["ConnCapacityProfile"]
+      local now = panapi.Now()
+      if tick - (fp2last[oldfp] or 0) <= 1 then
+         p = fp2path[oldfp]
+      elseif math.random(50) == 1 then
+         profile = "Exploration"
+         p = fp2path[raddr2fps[raddr][math.random(10)]]
+      elseif profile == "LowLatencyInteractive" or profile == "LowLatencyNonInteractive" then
+         p = nextBestRTTPath(raddr)
+      elseif profile == "CapacitySeeking" or profile == "Default" then
+         p = nextBestBWPath(laddr, raddr)
       else
-         return paths[raddr][1]
+         -- set to scavenger by default
+         profile = "Scavenger"
+         p = nextScavengePath(raddr)
       end
+      if p and p.Fingerprint ~= oldfp then
+         panapi.Log("Changed path [" .. laddr, "|", raddr .. "]:", profile, "from Path", fp2id[oldfp], "to Path", fp2id[p.Fingerprint])
+      -- keep track of chosen path via local address
+         laddr2fp[laddr] = p.Fingerprint
+         if oldfp and (profile == "CapacitySeeking" or profile == "Default") then
+            fp2bw[oldfp] = ((fp2bw[oldfp] or 0 ) + (laddr2bytes_on_path[laddr] or 0) / (now - laddr2switchtime[laddr])) / 2
+         end
+         laddr2bytes_on_path[laddr] = 0
+         laddr2switchtime[laddr] = now
+      end         
+      return p
    end
 end
 
 -- gets called whenever a path disappears(?)
 function panapi.PathDown(laddr, raddr, fp, pi)
-   calls.cur.PathDown = (calls.cur.PathDown or 0) + 1
    panapi.Log("PathDown called with", laddr, raddr, fp, pi)
-   for i,path in ipairs(paths[raddr]) do
-      if path.Fingerprint == fp then
-         panapi.Log("found path at index " .. tostring(i) .. ", removing")
-         table.remove(paths[raddr], i)
+   fp2path[fp] = nil
+   fp2rtt[fp] = nil
+   fp2last[fp] = nil
+   fp2bw[fp] = nil
+   for i,fp2 in ipairs(raddr2fps[raddr]) do
+      if fp == fp2 then
+         table.remove(raddr2fps[raddr], i)
          break
       end
    end
+   shutdown = tick + 10
 end
 
 function panapi.Refresh(laddr, raddr, ps)
-   calls.cur.Refresh = (calls.cur.Refresh or 0) + 1
    panapi.Log("Refresh", raddr, ps)
-   paths[raddr] = ps
-   rankpaths(raddr)
-   panapi.Log("debug! exiting for introspection", #paths[raddr])
-   os.exit(0)
-
+   panapi.Initialize(nil, laddr, raddr, ps)
+   shutdown = tick + 10
 end
 
 
 function panapi.Close(laddr, raddr)
-   calls.cur.Close = (calls.cur.Close or 0) + 1
    panapi.Log("Close", laddr, raddr)
-   --paths[raddr] = nil
+   raddr2fps[raddr] = nil
+   laddr2fp[laddr] = nil
+   laddr2prefs[laddr] = nil
+   raddr2fps[raddr] = nil
+   shutdown = tick + 10
 end
+
+
+function stats.UpdatedMetrics(laddr, raddr, rttStats, cwnd, bytesInFlight, packetsInFlight)
+   calls.cur.UpdatedMetrics = (calls.cur.UpdatedMetrics or 0) + 1
+   local fp = laddr2fp[laddr]
+   if fp == nil then return end
+   fp2last[fp] = tick
+   fp2rtt[fp] = rttStats.LatestRTT
+--   panapi.Log("\n", tprint(rttStats, 1))
+end
+
+function stats.SentPacket(laddr, raddr, size)
+   calls.cur.SentPacket = (calls.cur.SentPacket or 0) + 1
+   laddr2bytes_on_path[laddr] = (laddr2bytes_on_path[laddr] or 0) + size
+end
+
 
 function diffcallstats()
    local d = {}
@@ -113,13 +253,6 @@ function abscallstats()
    panapi.Log("function calls:\n" .. tprint(d, 2))
 end
 
-
-function panapi.Periodic(seconds)
-   calls.cur.Periodic = (calls.cur.Periodic or 0) + 1
-   abscallstats()
-end
-
-
 function stats.TracerForConnection(id, p, odcid)
    calls.cur.TracerForConnection = (calls.cur.TracerForConnection or 0) + 1
    --panapi.Log("id:", id, "perspective", p, "odcid", odcid)
@@ -136,6 +269,10 @@ function stats.ClosedConnection(laddr, raddr)
    calls.cur.ClosedConnection = (calls.cur.ClosedConnection or 0) + 1
 
 end
+function stats.Close(laddr, raddr)
+   calls.cur.Close = (calls.cur.Close or 0) + 1
+
+end
 function stats.SentTransportParameters(laddr, raddr)
    calls.cur.SentTransportParameters = (calls.cur.SentTransportParameters or 0) + 1
 
@@ -146,10 +283,6 @@ function stats.ReceivedTransportParameters(laddr, raddr)
 end
 function stats.RestoredTransportParameters(laddr, raddr)
    calls.cur.RestoredTransportParameters = (calls.cur.RestoredTransportParameters or 0) + 1
-
-end
-function stats.SentPacket(laddr, raddr)
-   calls.cur.SentPacket = (calls.cur.SentPacket or 0) + 1
 
 end
 function stats.ReceivedVersionNegotiationPacket(laddr, raddr)
@@ -173,9 +306,9 @@ function stats.DroppedPacket(laddr, raddr)
 
 end
 function stats.UpdatedMetrics(laddr, raddr, rttStats, cwnd, bytesInFlight, packetsInFlight)
-   calls.cur.UpdatedMetrics = (calls.cur.UpdatedMetrics or 0) + 1
    --panapi.Log("UpdatedMetrics", cwnd, bytesInFlight, packetsInFlight)
    --panapi.Log("\n", tprint(rttStats, 1))
+   --panapi.Log("\n", tprint(bytesInFlight, 1))
 end
 function stats.AcknowledgedPacket(laddr, raddr)
    calls.cur.AcknowledgedPacket = (calls.cur.AcknowledgedPacket or 0) + 1
@@ -247,6 +380,7 @@ function tprint (tbl, indent)
       return tostring(tbl)
    end
 end
+
 
 -- recursively perform a deep copy of a table
 function copy(thing)
