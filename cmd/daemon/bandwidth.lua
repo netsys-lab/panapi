@@ -114,7 +114,7 @@ function nextBestBWPath(laddr, raddr)
    table.sort(
       fingerprints,
       function(fp_a, fp_b)
-         return (fp2bw[fp_a] or 1000) < (fp2bw[fp_b] or 0)
+         return (fp2bw[fp_a] or 0) > (fp2bw[fp_b] or 0)
       end
     )
    return fp2path[fingerprints[1]]
