@@ -1,0 +1,14 @@
+--- # Path Oracle Test Topology
+ASes:
+  "1-ff00:0:110":
+    core: true
+    voting: true
+    authoritative: true
+    issuing: true
+  "1-ff00:0:111":
+    cert_issuer: 1-ff00:0:110
+links:
+  - {a: "1-ff00:0:110#1", b: "1-ff00:0:111#1", linkAtoB: CHILD, tcBw:  8Mbps}
+  - {a: "1-ff00:0:110#2", b: "1-ff00:0:111#2", linkAtoB: CHILD, tcBw: 16Mbps}
+  - {a: "1-ff00:0:110#3", b: "1-ff00:0:111#3", linkAtoB: CHILD, tcBw: 32Mbps}
+  - {a: "1-ff00:0:110#4", b: "1-ff00:0:111#4", linkAtoB: CHILD, tcBw: 64Mbps}
