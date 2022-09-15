@@ -16,6 +16,7 @@ package main
 import (
 	"crypto/rand"
 	"flag"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -164,13 +165,42 @@ func runClient(bytes int64, remote string, proto taps.Protocol) error {
 		return err
 	}
 
-	start := time.Now()
+	var (
+		total int64
+		lastb float64
+	)
+	buf := make([]byte, 1024*32)
+	reader := io.LimitReader(rand.Reader, bytes)
+	begin := time.Now()
+	last := begin
+	for {
+		nr, err := reader.Read(buf)
+		nw, erw := Connection.Write(buf[:nr])
+		total += int64(nw)
+		lastb += float64(nw)
+		if erw == nil && nw != nr {
+			return fmt.Errorf("short write")
+		}
+		if err == io.EOF {
+			break
+		}
+		if erw != nil {
+			return erw
+		}
+		if err != nil {
+			return err
+		}
 
-	n, err := io.Copy(Connection, io.LimitReader(rand.Reader, bytes))
+		if d := time.Since(last); d >= time.Second {
+			last = time.Now()
+			fmt.Printf("%f\n", lastb/d.Seconds())
+			lastb = 0
+		}
+	}
 
-	dur := time.Since(start)
+	dur := time.Since(begin)
 
-	log.Printf("Copied %d bytes in %s: %.3f Mbps", n, dur, float64(n)/(1000000*dur.Seconds()))
+	log.Printf("Copied %d bytes in %s: %.3f Mbps", total, dur, float64(total)/(1000000*dur.Seconds()))
 
 	Connection.Close()
 	return err

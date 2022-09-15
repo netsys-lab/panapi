@@ -68,9 +68,10 @@ function nextScavengePath(raddr)
    table.sort(
       fingerprints,
       function(fp_a, fp_b)
-         return fp2last[fp_a] < fp2last[fp_b]
+         return (fp2last[fp_a] or 0) < (fp2last[fp_b] or 0)
       end
    )
+   panapi.Log(tprint(fp2last))
    --panapi.Log("Chosen tick:", fp2last[fingerprints[1]])
    return fp2path[fingerprints[1]]
 end
@@ -107,6 +108,9 @@ end
 
 function nextBestBWPath(laddr, raddr)
    local fp = laddr2fp[laddr]
+   if fp == nil then
+      return nextScavengePath(raddr)
+   end
    local fingerprints = {}
    for _, fp in ipairs(raddr2fps[raddr]) do
       table.insert(fingerprints, fp)
@@ -129,7 +133,7 @@ function panapi.Initialize(prefs, laddr, raddr, ps)
    for i, path in ipairs(ps) do
       local fp = path.Fingerprint
       fp2path[fp] = path
-      fp2last[fp] = tick
+      fp2last[fp] = fp2last[fp] or tick
       fp2id[fp] = i
       table.insert(raddr2fps[raddr], fp)
    end
@@ -155,9 +159,12 @@ function panapi.Path(laddr, raddr)
       local oldfp = laddr2fp[laddr]
       local profile = laddr2prefs[laddr]["ConnCapacityProfile"]
       local now = panapi.Now()
-      if tick - (fp2last[oldfp] or 0) <= 1 then
-         p = fp2path[oldfp]
-      elseif math.random(50) == 1 then
+      if oldfp == nil then
+         profile = "New Connection"
+         p = nextScavengePath(raddr)
+      elseif tick - (fp2last[oldfp] or 0) <= 1 then
+         return fp2path[oldfp]
+      elseif math.random(50) == 0 then
          profile = "Exploration"
          p = fp2path[raddr2fps[raddr][math.random(10)]]
       elseif profile == "LowLatencyInteractive" or profile == "LowLatencyNonInteractive" then
@@ -173,12 +180,15 @@ function panapi.Path(laddr, raddr)
          panapi.Log("Changed path [" .. laddr, "|", raddr .. "]:", profile, "from Path", fp2id[oldfp], "to Path", fp2id[p.Fingerprint])
       -- keep track of chosen path via local address
          laddr2fp[laddr] = p.Fingerprint
+         fp2last[p.Fingerprint] = tick
          if oldfp and (profile == "CapacitySeeking" or profile == "Default") then
             fp2bw[oldfp] = ((fp2bw[oldfp] or 0 ) + (laddr2bytes_on_path[laddr] or 0) / (now - laddr2switchtime[laddr])) / 2
          end
          laddr2bytes_on_path[laddr] = 0
          laddr2switchtime[laddr] = now
-      end         
+      else
+         fp2last[oldfp] = tick
+      end
       return p
    end
 end
@@ -208,11 +218,11 @@ end
 
 function panapi.Close(laddr, raddr)
    panapi.Log("Close", laddr, raddr)
-   raddr2fps[raddr] = nil
    laddr2fp[laddr] = nil
    laddr2prefs[laddr] = nil
    raddr2fps[raddr] = nil
-   shutdown = tick + 10
+   panapi.Log(tprint(fp2bw))
+   --shutdown = tick + 10
 end
 
 
