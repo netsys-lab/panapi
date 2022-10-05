@@ -162,7 +162,7 @@ func runClient(bytes int64, remote string, proto taps.Protocol) error {
 
 	Connection, err := Preconnection.Initiate()
 	if err != nil {
-		return err
+		return fmt.Errorf("Initate error: %s", err)
 	}
 
 	var (
@@ -185,9 +185,11 @@ func runClient(bytes int64, remote string, proto taps.Protocol) error {
 			break
 		}
 		if erw != nil {
+			erw = fmt.Errorf("Write error: %s", erw)
 			return erw
 		}
 		if err != nil {
+			err = fmt.Errorf("Read err: %s", err)
 			return err
 		}
 
