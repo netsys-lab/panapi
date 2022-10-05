@@ -68,10 +68,10 @@ function nextScavengePath(raddr)
    table.sort(
       fingerprints,
       function(fp_a, fp_b)
-         return fp2last[fp_a] < fp2last[fp_b]
+         return (fp2last[fp_a] or 0) < (fp2last[fp_b] or 0)
       end
    )
-   --panapi.Log("Chosen tick:", fp2last[fingerprints[1]])
+--   panapi.Log("Chosen tick:", fp2last[fingerprints[1]])
    return fp2path[fingerprints[1]]
 end
 
@@ -129,8 +129,9 @@ function panapi.Initialize(prefs, laddr, raddr, ps)
    for i, path in ipairs(ps) do
       local fp = path.Fingerprint
       fp2path[fp] = path
-      fp2last[fp] = tick
+--      fp2last[fp] = tick
       fp2id[fp] = i
+      panapi.Log("Path", i, fp)
       table.insert(raddr2fps[raddr], fp)
    end
    panapi.SetPreferences(prefs, laddr, raddr)
@@ -151,15 +152,17 @@ end
 -- implementation needs to be efficient
 function panapi.Path(laddr, raddr)
    if #raddr2fps[raddr] > 0 then
-      local p = nil
       local oldfp = laddr2fp[laddr]
+      local p = fp2path[oldfp]
       local profile = laddr2prefs[laddr]["ConnCapacityProfile"]
       local now = panapi.Now()
-      if tick - (fp2last[oldfp] or 0) <= 1 then
+      if p ~= nil and tick - (fp2last[oldfp] or 0) <= 1 then
          p = fp2path[oldfp]
       elseif math.random(50) == 1 then
          profile = "Exploration"
-         p = fp2path[raddr2fps[raddr][math.random(10)]]
+         --local options = raddr2fps[raddr] 
+         --p = fp2path[options[math.random(#options)]]
+         p = nextScavengePath(raddr)
       elseif profile == "LowLatencyInteractive" or profile == "LowLatencyNonInteractive" then
          p = nextBestRTTPath(raddr)
       elseif profile == "CapacitySeeking" or profile == "Default" then
@@ -170,10 +173,11 @@ function panapi.Path(laddr, raddr)
          p = nextScavengePath(raddr)
       end
       if p and p.Fingerprint ~= oldfp then
+	 fp2last[p.Fingerprint] = tick
          panapi.Log("Changed path [" .. laddr, "|", raddr .. "]:", profile, "from Path", fp2id[oldfp], "to Path", fp2id[p.Fingerprint])
       -- keep track of chosen path via local address
          laddr2fp[laddr] = p.Fingerprint
-         if oldfp and (profile == "CapacitySeeking" or profile == "Default") then
+         if oldfp then
             fp2bw[oldfp] = ((fp2bw[oldfp] or 0 ) + (laddr2bytes_on_path[laddr] or 0) / (now - laddr2switchtime[laddr])) / 2
          end
          laddr2bytes_on_path[laddr] = 0
@@ -190,37 +194,44 @@ function panapi.PathDown(laddr, raddr, fp, pi)
    fp2rtt[fp] = nil
    fp2last[fp] = nil
    fp2bw[fp] = nil
+
    for i,fp2 in ipairs(raddr2fps[raddr]) do
       if fp == fp2 then
          table.remove(raddr2fps[raddr], i)
-         break
       end
    end
-   shutdown = tick + 10
+   for laddr,fp2 in pairs(laddr2fp) do
+      if fp == fp2 then
+         laddr2fp[laddr] = nil
+      end
+   end
+       
+--   shutdown = tick + 10
 end
 
 function panapi.Refresh(laddr, raddr, ps)
    panapi.Log("Refresh", raddr, ps)
    panapi.Initialize(nil, laddr, raddr, ps)
-   shutdown = tick + 10
+--   shutdown = tick + 10
 end
 
 
 function panapi.Close(laddr, raddr)
    panapi.Log("Close", laddr, raddr)
-   raddr2fps[raddr] = nil
+   panapi.Log(tprint(fp2bw))
    laddr2fp[laddr] = nil
    laddr2prefs[laddr] = nil
-   raddr2fps[raddr] = nil
-   shutdown = tick + 10
+   --shutdown = tick + 10
 end
 
 
 function stats.UpdatedMetrics(laddr, raddr, rttStats, cwnd, bytesInFlight, packetsInFlight)
    calls.cur.UpdatedMetrics = (calls.cur.UpdatedMetrics or 0) + 1
    local fp = laddr2fp[laddr]
-   if fp == nil then return end
-   fp2last[fp] = tick
+   if fp == nil then
+       return 
+   end
+--   fp2last[fp] = tick
    fp2rtt[fp] = rttStats.LatestRTT
 --   panapi.Log("\n", tprint(rttStats, 1))
 end
@@ -305,11 +316,6 @@ function stats.DroppedPacket(laddr, raddr)
    calls.cur.DroppedPacket = (calls.cur.DroppedPacket or 0) + 1
 
 end
-function stats.UpdatedMetrics(laddr, raddr, rttStats, cwnd, bytesInFlight, packetsInFlight)
-   --panapi.Log("UpdatedMetrics", cwnd, bytesInFlight, packetsInFlight)
-   --panapi.Log("\n", tprint(rttStats, 1))
-   --panapi.Log("\n", tprint(bytesInFlight, 1))
-end
 function stats.AcknowledgedPacket(laddr, raddr)
    calls.cur.AcknowledgedPacket = (calls.cur.AcknowledgedPacket or 0) + 1
 
@@ -367,7 +373,7 @@ function tprint (tbl, indent)
    if type(tbl) == "table" then
       local s = ""
       for k, v in pairs(tbl) do
-         formatting = string.rep("  ", indent) .. k .. ": "
+         formatting = string.rep("  ", indent) .. tprint(k, indent) .. ": "
          if type(v) == "table" then
             --print(formatting)
             s = s ..  formatting .. "\n" .. tprint(v, indent+1)
