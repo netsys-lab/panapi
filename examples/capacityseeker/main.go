@@ -33,7 +33,7 @@ import (
 
 func main() {
 	var (
-		remote, local, t, n                          string
+		remote, local, t, n, p                       string
 		proto                                        taps.Protocol
 		server, client, daemontracer, daemonselector bool
 		bytes                                        int64
@@ -45,13 +45,14 @@ func main() {
         (e.g. 17-ffaa:1:1,[127.0.0.1]:1337 or 0.0.0.0:1337, depending on chosen network type)`)
 	flag.StringVar(&n, "net", "IP", "network type (IP|SCION)")
 	flag.StringVar(&t, "transport", "QUIC", "transport protocol (TCP|QUIC)")
+	flag.StringVar(&p, "profile", "CapacitySeeking", "SCION capacity profile (Default|CapacitySeeking|Scavenger|LowLatency)")
 	flag.BoolVar(&daemontracer, "daemontracer", false, "use PANAPI daemon tracer")
 	flag.BoolVar(&daemonselector, "daemonselector", false, "use PANAPI daemon selector")
 	flag.Int64Var(&bytes, "bytes", 1000*1000*10, "amount of bytes to transfer during experiment")
 
 	flag.Parse()
 
-	log.SetFlags(log.Lshortfile)
+	//log.SetFlags(log.Lshortfile)
 
 	if len(local) > 0 {
 		server = true
@@ -108,10 +109,76 @@ func main() {
 		log.Fatalln("Either specify -t TCP or -t QUIC")
 	}
 
+	profile := taps.Default
+	switch p {
+	case "CapacitySeeking":
+		profile = taps.CapacitySeeking
+	case "Scavenger":
+		profile = taps.Scavenger
+	case "LowLatency":
+		profile = taps.LowLatencyNonInteractive
+	case "Default", "":
+	default:
+		log.Fatalf("Unknown capacity profile \"%s\"", p)
+	}
+
 	if len(local) > 0 {
 		log.Println(runServer(local, proto))
 	} else {
-		log.Println(runClient(bytes, remote, proto))
+		err := runClient(bytes, remote, proto, profile)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+}
+
+func myCopy(w io.Writer, r io.Reader, c chan int) (total int64, err error) {
+	buf := make([]byte, 1024*32)
+	for {
+		var nr int
+		nr, err = r.Read(buf)
+		nw, erw := w.Write(buf[:nr])
+		total += int64(nw)
+		c <- nr
+		if erw == nil && nw != nr {
+			err = fmt.Errorf("short write")
+			break
+		}
+		if err == io.EOF {
+			err = nil
+			break
+		}
+		if erw != nil {
+			err = fmt.Errorf("Write error: %s", erw)
+			break
+		}
+		if err != nil {
+			err = fmt.Errorf("Read err: %s", err)
+			break
+		}
+	}
+	return
+}
+
+func report(c chan int, verbose bool) {
+	total := 0
+	subtotal := 0
+	ticker := time.Tick(time.Second)
+	begin := time.Now()
+	for {
+		select {
+		case bytes := <-c:
+			subtotal += bytes
+		case <-ticker:
+			total += subtotal
+			dur := time.Since(begin)
+			fmt.Printf("%d,%d,%d\n", int(dur.Seconds()), subtotal, total)
+			if verbose {
+				log.Printf("%.3f kb/s", float64(subtotal)/1000)
+			}
+			subtotal = 0
+
+		}
 	}
 }
 
@@ -129,26 +196,25 @@ func runServer(local string, proto taps.Protocol) error {
 		return err
 	}
 
+	c := make(chan int)
+	running := false
+
 	for {
 		Connection, err := Listener.Accept()
+		if !running {
+			go report(c, true)
+			running = true
+		}
 		log.Printf("Got Connection from: %s", Connection.Preconnection().RemoteEndpoint.Address)
 		if err != nil {
 			log.Println(err)
 		} else {
-			go func(conn taps.Connection) {
-				start := time.Now()
-				n, err := io.Copy(ioutil.Discard, conn)
-				dur := time.Since(start)
-				if err != nil {
-					log.Println(err)
-				}
-				log.Printf("Successfully received %d bytes from %s: %.3f Mbps", n, Connection.Preconnection().RemoteEndpoint.Address, float64(n)/(1000000*dur.Seconds()))
-			}(Connection)
+			go myCopy(ioutil.Discard, Connection, c)
 		}
 	}
 }
 
-func runClient(bytes int64, remote string, proto taps.Protocol) error {
+func runClient(bytes int64, remote string, proto taps.Protocol, profile taps.CapacityProfile) error {
 	RemoteSpecifier := taps.RemoteEndpoint{}
 	RemoteSpecifier.Address = remote
 	RemoteSpecifier.Protocol = proto
@@ -156,7 +222,7 @@ func runClient(bytes int64, remote string, proto taps.Protocol) error {
 	Preconnection := taps.Preconnection{
 		RemoteEndpoint: &RemoteSpecifier,
 		ConnectionPreferences: &taps.ConnectionPreferences{
-			ConnCapacityProfile: taps.CapacitySeeking,
+			ConnCapacityProfile: profile,
 		},
 	}
 
@@ -164,47 +230,16 @@ func runClient(bytes int64, remote string, proto taps.Protocol) error {
 	if err != nil {
 		return fmt.Errorf("Initate error: %s", err)
 	}
+	defer Connection.Close()
 
-	var (
-		total int64
-		lastb float64
-	)
-	buf := make([]byte, 1024*32)
+	c := make(chan int)
+	go report(c, false)
+
 	reader := io.LimitReader(rand.Reader, bytes)
 	begin := time.Now()
-	last := begin
-	for {
-		nr, err := reader.Read(buf)
-		nw, erw := Connection.Write(buf[:nr])
-		total += int64(nw)
-		lastb += float64(nw)
-		if erw == nil && nw != nr {
-			return fmt.Errorf("short write")
-		}
-		if err == io.EOF {
-			break
-		}
-		if erw != nil {
-			erw = fmt.Errorf("Write error: %s", erw)
-			return erw
-		}
-		if err != nil {
-			err = fmt.Errorf("Read err: %s", err)
-			return err
-		}
-
-		if d := time.Since(last); d >= time.Second {
-			last = time.Now()
-			fmt.Printf("%f\n", lastb/d.Seconds())
-			lastb = 0
-		}
+	n, err := myCopy(Connection, reader, c)
+	if err == nil {
+		log.Printf("%s: Average: %.3f kb/s", profile, float64(n)/(1000*time.Since(begin).Seconds()))
 	}
-
-	dur := time.Since(begin)
-
-	log.Printf("Copied %d bytes in %s: %.3f Mbps", total, dur, float64(total)/(1000000*dur.Seconds()))
-
-	Connection.Close()
 	return err
-
 }

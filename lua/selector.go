@@ -291,7 +291,7 @@ func (s *LuaSelector) PathDown(local, remote pan.UDPAddr, fp pan.PathFingerprint
 	//s.l.Println("PathDown()")
 	s.Lock()
 	defer s.Unlock()
-	s.Printf("PathDown called with fp %v and pi %v", fp, pi)
+	//s.Printf("PathDown called with fp %v and pi %v", fp, pi)
 	return s.CallByParam(
 		lua.P{
 			Fn:      s.mod.RawGetString("PathDown"),
@@ -347,7 +347,9 @@ func (s *LuaSelector) Close(local, remote pan.UDPAddr) error {
 		lua.LString(remote.String()),
 	)
 
-	log.Println("Close called on LuaSelector:", err)
+	if err != nil {
+		log.Println("Close called on LuaSelector:", err)
+	}
 	//s.L.Close()
 	return err
 }

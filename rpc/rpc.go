@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -68,7 +68,7 @@ type Client struct {
 func NewClient(conn io.ReadWriteCloser) (*Client, error) {
 	client := rpc.NewClient(conn)
 	fname := fmt.Sprintf("/tmp/%s-quic-rpc-client.log", time.Now().Format("2006-01-02-15-04"))
-	log.Println("quic rpc client file opened as", fname)
+	//log.Println("quic rpc client file opened as", fname)
 	f, err := os.Create(fname)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func NewClient(conn io.ReadWriteCloser) (*Client, error) {
 		return nil, err
 	} else {*/
 
-	log.Printf("RPC connection etablished with ID %d", *id.Value)
+	log.Printf("RPC connection etablished")
 	//}
 
 	return &Client{client, log.New(f, "rpc-client", log.Lshortfile|log.Ltime), *id.Value}, nil

@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -118,7 +118,7 @@ func NewSelectorServer(selector ServerSelector) *SelectorServer {
 }
 
 func (s *SelectorServer) Initialize(args, resp *SelectorMsg) error {
-	log.Println("Initialize invoked")
+	//log.Println("Initialize invoked")
 	paths := make([]*pan.Path, len(args.Paths))
 	for i, p := range args.Paths {
 		paths[i] = p.PanPath()
@@ -150,7 +150,7 @@ func (s *SelectorServer) Path(args, resp *SelectorMsg) error {
 }
 
 func (s *SelectorServer) PathDown(args, resp *SelectorMsg) error {
-	log.Println("PathDown called")
+	//log.Println("PathDown called")
 	if args.Remote == nil || args.Fingerprint == nil || args.PathInterface == nil {
 		return ErrDeref
 	}
@@ -158,7 +158,7 @@ func (s *SelectorServer) PathDown(args, resp *SelectorMsg) error {
 }
 
 func (s *SelectorServer) Refresh(args, resp *SelectorMsg) error {
-	log.Println("Refresh invoked")
+	//log.Println("Refresh invoked")
 	paths := make([]*pan.Path, len(args.Paths))
 	for i, p := range args.Paths {
 		paths[i] = p.PanPath()
@@ -171,7 +171,7 @@ func (s *SelectorServer) Refresh(args, resp *SelectorMsg) error {
 }
 
 func (s *SelectorServer) Close(args, resp *SelectorMsg) error {
-	log.Println("Close called")
+	//log.Println("Close called")
 	if args.Remote == nil {
 		return ErrDeref
 	}

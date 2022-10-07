@@ -12,18 +12,6 @@ calls = {
 -- shutdown
 shutdown = 0
 
--- gets called every second or so
-function panapi.Periodic(seconds)
-   tick = tick + 1
-   if shutdown ~= 0 then
-      panapi.Log("shutting down in", shutdown - tick, "seconds")
-      if tick > shutdown then
-         panapi.Log("shutting down to inspect correct path expiry behavior")
-         panapi.Log(tprint(fp2bw))
-         os.exit(0)
-      end
-   end
-end
 
 -- map remote address to path fingerprints
 raddr2fps = {}
@@ -46,6 +34,9 @@ fp2ticks = {}
 -- map path fingerprint to path ID (number)
 fp2id = {}
 
+-- map path fingerprint to number of local addresses
+fp2laddrs = {}
+
 -- map local address to preferences table
 laddr2prefs = {}
 
@@ -58,9 +49,32 @@ laddr2switchtime = {}
 -- map local address to transferred bytes on the current path
 laddr2bytes_on_path = {}
 
+-- gets called every second or so
+function panapi.Periodic(seconds)
+   tick = tick + 1
+   local fingerprints = {}
+   for fp, _ in pairs(fp2path) do
+      table.insert(fingerprints, fp)
+   end
+   table.sort(fingerprints)
+   panapi.Log(string.rep("=", 10), "Tick", string.rep("=", 10))
+   for i, fp in ipairs(fingerprints) do
+      panapi.Log("Path", "[", fp, "]:", string.format("%.4f", (fp2bw[fp] or 0) / (fp2laddrs[fp] or 1)), string.rep("#", fp2laddrs[fp]))
+   end
+
+   if shutdown ~= 0 then
+      panapi.Log("shutting down in", shutdown - tick, "seconds")
+      if tick > shutdown then
+         panapi.Log("shutting down to inspect correct path expiry behavior")
+         panapi.Log(tprint(fp2bw))
+         os.exit(0)
+      end
+   end
+end
+
 
 -- pick path with oldest tick (i.e., longest unused path)
-function nextScavengePath(raddr)
+function nextOldestPath(raddr)
    local fingerprints = {}
    for _, fp in ipairs(raddr2fps[raddr]) do
       table.insert(fingerprints, fp)
@@ -69,6 +83,22 @@ function nextScavengePath(raddr)
       fingerprints,
       function(fp_a, fp_b)
          return (fp2last[fp_a] or 0) < (fp2last[fp_b] or 0)
+      end
+   )
+--   panapi.Log("Chosen tick:", fp2last[fingerprints[1]])
+   return fp2path[fingerprints[1]]
+end
+
+
+function nextScavengePath(raddr)
+   local fingerprints = {}
+   for _, fp in ipairs(raddr2fps[raddr]) do
+      table.insert(fingerprints, fp)
+   end
+   table.sort(
+      fingerprints,
+      function(fp_a, fp_b)
+         return (fp2laddrs[fp_a] or 0) < (fp2laddrs[fp_b] or 0)
       end
    )
 --   panapi.Log("Chosen tick:", fp2last[fingerprints[1]])
@@ -87,7 +117,6 @@ function nextWorstRTTPath(raddr)
          return (fp2rtt[fp_a] or 1000) > (fp2rtt[fp_b] or 1000)
       end
     )
-    --panapi.Log("Chosen tick:", fp2tick[fingerprints[1]])
     return fp2path[fingerprints[1]]
 end
 
@@ -106,7 +135,6 @@ function nextBestRTTPath(raddr)
 end
 
 function nextBestBWPath(laddr, raddr)
-   local fp = laddr2fp[laddr]
    local fingerprints = {}
    for _, fp in ipairs(raddr2fps[raddr]) do
       table.insert(fingerprints, fp)
@@ -114,10 +142,18 @@ function nextBestBWPath(laddr, raddr)
    table.sort(
       fingerprints,
       function(fp_a, fp_b)
-         return (fp2bw[fp_a] or 1000) < (fp2bw[fp_b] or 0)
+         return (fp2bw[fp_a] or 1000) / (fp2laddrs[fp_a] or 1) > (fp2bw[fp_b] or 0) / (fp2laddrs[fp_b] or 1)
       end
     )
    return fp2path[fingerprints[1]]
+end
+
+function nextRandomPath(raddr)
+   local fingerprints = {}
+   for _, fp in ipairs(raddr2fps[raddr]) do
+      table.insert(fingerprints, fp)
+   end
+   return fp2path[fingerprints[math.random(#fingerprints)]]
 end
 
 
@@ -126,13 +162,24 @@ function panapi.Initialize(prefs, laddr, raddr, ps)
    panapi.Log("New connection [" .. laddr, "|", raddr .. "]")
    raddr2fps[raddr] = raddr2fps[raddr] or {}
    laddr2switchtime[laddr] = panapi.Now()
+   table.sort(ps, function(a, b) return a.Fingerprint < b.Fingerprint end)
    for i, path in ipairs(ps) do
       local fp = path.Fingerprint
       fp2path[fp] = path
 --      fp2last[fp] = tick
       fp2id[fp] = i
+      fp2laddrs[fp] = fp2laddrs[fp] or 0
       panapi.Log("Path", i, fp)
-      table.insert(raddr2fps[raddr], fp)
+      local exists = false
+      for i, fp2 in ipairs(raddr2fps[raddr]) do
+         if fp == fp2 then
+            exists = true
+            break
+         end
+      end
+      if exists == false then
+         table.insert(raddr2fps[raddr], fp)
+      end
    end
    panapi.SetPreferences(prefs, laddr, raddr)
 end
@@ -156,33 +203,42 @@ function panapi.Path(laddr, raddr)
       local p = fp2path[oldfp]
       local profile = laddr2prefs[laddr]["ConnCapacityProfile"]
       local now = panapi.Now()
-      if p ~= nil and tick - (fp2last[oldfp] or 0) <= 1 then
-         p = fp2path[oldfp]
-      elseif math.random(50) == 1 then
-         profile = "Exploration"
-         --local options = raddr2fps[raddr] 
-         --p = fp2path[options[math.random(#options)]]
+      if p == nil then
          p = nextScavengePath(raddr)
-      elseif profile == "LowLatencyInteractive" or profile == "LowLatencyNonInteractive" then
-         p = nextBestRTTPath(raddr)
-      elseif profile == "CapacitySeeking" or profile == "Default" then
-         p = nextBestBWPath(laddr, raddr)
-      else
-         -- set to scavenger by default
-         profile = "Scavenger"
-         p = nextScavengePath(raddr)
+      elseif now - laddr2switchtime[laddr] > 1000000 then
+         if math.random(100) == 1 then
+            profile = "Exploration"
+            p = nextOldestPath(raddr)
+         elseif profile == "LowLatencyInteractive" or profile == "LowLatencyNonInteractive" then
+            p = nextBestRTTPath(raddr)
+         elseif profile == "CapacitySeeking" then
+            p = nextBestBWPath(laddr, raddr)
+         elseif profile == "Scavenger" then
+            -- set to scavenger by default
+            profile = "Scavenger"
+            p = nextScavengePath(raddr)
+         else
+            profile = "Random"
+            p = nextRandomPath(raddr)
+         end
       end
       if p and p.Fingerprint ~= oldfp then
 	 fp2last[p.Fingerprint] = tick
-         panapi.Log("Changed path [" .. laddr, "|", raddr .. "]:", profile, "from Path", fp2id[oldfp], "to Path", fp2id[p.Fingerprint])
+         --panapi.Log("Changed path [" .. laddr, "|", raddr .. "]:", profile, "from Path", fp2id[oldfp], "to Path", fp2id[p.Fingerprint])
       -- keep track of chosen path via local address
          laddr2fp[laddr] = p.Fingerprint
          if oldfp then
-            fp2bw[oldfp] = ((fp2bw[oldfp] or 0 ) + (laddr2bytes_on_path[laddr] or 0) / (now - laddr2switchtime[laddr])) / 2
+            fp2laddrs[oldfp] = fp2laddrs[oldfp] - 1
+            fp2bw[oldfp] = ((fp2bw[oldfp] or 0 ) * 9 + (laddr2bytes_on_path[laddr] or 0) / (now - laddr2switchtime[laddr])) / 10
          end
          laddr2bytes_on_path[laddr] = 0
          laddr2switchtime[laddr] = now
-      end         
+	 fp2laddrs[p.Fingerprint] = (fp2laddrs[p.Fingerprint] or 0) + 1
+      end
+      if p == nil then
+         panapi.Log("path gone, trying to recover")
+         return panapi.Path(laddr, raddr)
+      end
       return p
    end
 end
@@ -194,6 +250,7 @@ function panapi.PathDown(laddr, raddr, fp, pi)
    fp2rtt[fp] = nil
    fp2last[fp] = nil
    fp2bw[fp] = nil
+   fp2laddrs[fp] = 0
 
    for i,fp2 in ipairs(raddr2fps[raddr]) do
       if fp == fp2 then
@@ -218,8 +275,11 @@ end
 
 function panapi.Close(laddr, raddr)
    panapi.Log("Close", laddr, raddr)
-   panapi.Log(tprint(fp2bw))
+   --panapi.Log(tprint(fp2bw))
+   --panapi.Log(tprint(fp2laddrs))
+   local fp = laddr2fp[laddr]
    laddr2fp[laddr] = nil
+   fp2laddrs[fp] = (fp2laddrs[fp] or 1) - 1
    laddr2prefs[laddr] = nil
    --shutdown = tick + 10
 end
