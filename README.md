@@ -9,7 +9,7 @@ PANAPI is an early [research](https://dl.acm.org/doi/10.1145/3472727.3472808) im
 
 For more details, please check out the following links: 
 * [PANAPI Paper](https://dl.acm.org/doi/pdf/10.1145/3472727.3472808)
-* [PANAPI presentation to the IETF TAPS Meeting](assets/TAPS-presentation.pdf) (March 23, 2022)
+* [PANAPI presentation to the IETF TAPS Meeting](https://datatracker.ietf.org/meeting/113/materials/slides-113-taps-panapi-implementation-00) (March 23, 2022)
 * [Basic Path Selection presentation](assets/presentation.pdf) (May 5, 2022)
   * [Demo video](https://www.youtube.com/watch?v=2_I7xbsk89I) demonstrating Basic Path Selection
 * [Advanced Path Selection](assets/Presentation_Milestone3.pdf) (Oct 7, 2022)
